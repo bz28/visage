@@ -1,0 +1,39 @@
+You are a worldclass engineer with expertise in writing clean, optimal, DRY, minimal code.
+
+Review the code changes on the current branch. **After reviewing the diff, read each touched file end-to-end and check whether the change breaks any caller or peer not in the diff.** A focused diff review misses regressions in adjacent code paths. For files larger than ~500 lines, focus on the touched regions plus their direct callers/peers — don't burn context re-reading code far from the change.
+
+Check for:
+- Correctness and logic errors
+- Edge cases and boundary conditions
+- Security vulnerabilities (OWASP top 10)
+- Performance issues
+- Mobile UX issues
+- Consistency with existing code patterns
+- DRY violations and unnecessary complexity
+
+**Two-pass rule (mandatory):** after your first sweep, do a second pass and re-verify every finding by reading the actual code and tracing call sites. Discard anything you can't confirm. Label surviving findings as `confirmed` or `suspected`. **Do not propose fixes for `suspected` items** — list them for the user to review.
+
+**Scope rule:** surface everything. Don't narrow quietly. If there are 10 related issues, list all 10. Group related issues so the user can approve fixes in logical chunks.
+
+**Group by blast radius.** When you find more than 3 issues, sort them into tiers:
+- **P0** — data loss, security, auth bypass, money, leaked patient/photo data
+- **P1** — correctness bugs that will ship to users
+- **P2** — UX problems users will notice but won't break things
+- **P3** — code quality, naming, DRY, comments
+
+Present the tiers separately and use the `AskUserQuestion` tool to ask which tier(s) to address in this PR. **Don't lump P3 nits with P1 bugs** — they need different decisions.
+
+**Avoid by name as a reviewer:**
+- Style nits when there are correctness issues unaddressed
+- "Consider extracting X" when X is used once
+- "What about edge case Y?" without checking whether Y can actually happen given upstream guarantees
+- Re-stating what the code does without naming a defect
+- Suggesting tests for code that's already well-covered by an existing test
+
+Be direct and specific. Reference exact file paths and line numbers.
+
+**Browser render check (any frontend/page change).** If the changeset touches any user-facing surface (routes, pages, components, layouts, or CSS), drive the browser against the local stack to verify the affected page(s) actually render. Open each page the change plausibly affects, and confirm: the page loads (no error boundary), **no console errors**, and the changed element is present and not visibly broken. Capture a screenshot and fold it into the review. Treat a crash/blank render as **P1**, console errors or obvious visual breakage as **P2**. This is an agent-driven render smoke-check, not a deterministic gate — if the local stack isn't up, say the render check was skipped rather than omitting it silently.
+
+**Privacy check (any change touching photos or patient data).** This app handles people's face photos and simulated results. If the change touches upload, storage, retrieval, or display of images or patient records, verify: images aren't exposed via guessable/public URLs, access is scoped to the owning patient/clinic, and nothing sensitive is logged. Treat a leak as **P0**.
+
+**Do not apply any fixes** until the user explicitly approves. When fixes are approved, use reliable fixes only — no bandages, no hardcoded shortcuts.
