@@ -1,16 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { detectFace, type Pt } from "@/lib/landmarks";
+import { detectFace } from "@/lib/landmarks";
 import { computeMeasurements } from "@/lib/measurements";
-import type { Measurements } from "@/lib/measurements-schema";
 import { baselineAssessment } from "@/lib/baseline";
 import { buildAnnotations, type Marker } from "@/lib/annotations";
 import type { Assessment } from "@/lib/assessment-schema";
 import { PhotoCapture } from "./PhotoCapture";
 import { FaceCanvas } from "./FaceCanvas";
 import { AssessmentResult } from "./AssessmentResult";
-import { ConsentDialog } from "./ConsentDialog";
 import { BookConsult } from "./BookConsult";
 
 type Step = "capture" | "analyzing" | "result" | "book";
@@ -21,10 +19,7 @@ interface Photo {
   height: number;
 }
 interface Analysis {
-  landmarks: Pt[];
-  measurements: Measurements;
   assessment: Assessment;
-  source: "ai" | "baseline";
   markers: Marker[];
   numberByArea: Record<string, number>;
 }
@@ -43,8 +38,6 @@ export function ScanFlow() {
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [active, setActive] = useState<string | null>(null);
-  const [consentOpen, setConsentOpen] = useState(false);
-  const [deeperLoading, setDeeperLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function onCapture(dataUrl: string) {
@@ -58,72 +51,48 @@ export function ScanFlow() {
 
       const result = await detectFace(img, w, h);
       if (result.status === "no-face") {
-        setError(
-          "We couldn't find a face. Try a straight-on photo in better light.",
-        );
+        setError("We couldn't find a face. Try a straight-on photo in better light.");
         setStep("capture");
         return;
       }
       if (result.status === "multiple-faces" || !result.landmarks) {
-        setError("We see more than one face — try a solo selfie.");
+        setError("We see more than one face — try a solo photo.");
         setStep("capture");
         return;
       }
 
-      const measurements = computeMeasurements(result.landmarks);
-      const assessment = baselineAssessment(measurements);
+      const landmarks = result.landmarks;
+      const measurements = computeMeasurements(landmarks);
+      const baseline = baselineAssessment(measurements);
+
+      // AI read by default; fall back to the on-device baseline if it fails.
+      let assessment = baseline;
+      try {
+        const res = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            measurements,
+            imageBase64: dataUrl.split(",")[1],
+          }),
+        });
+        if (res.ok) {
+          const data: { assessment: Assessment } = await res.json();
+          assessment = data.assessment;
+        }
+      } catch {
+        // keep baseline
+      }
+
       const { markers, numberByArea } = buildAnnotations(
         assessment.areas,
-        result.landmarks,
+        landmarks,
       );
-      setAnalysis({
-        landmarks: result.landmarks,
-        measurements,
-        assessment,
-        source: "baseline",
-        markers,
-        numberByArea,
-      });
+      setAnalysis({ assessment, markers, numberByArea });
       setStep("result");
     } catch {
       setError("Something went wrong reading that photo. Please try again.");
       setStep("capture");
-    }
-  }
-
-  async function runDeeper() {
-    if (!analysis || !photo) return;
-    setConsentOpen(false);
-    setDeeperLoading(true);
-    try {
-      const imageBase64 = photo.dataUrl.split(",")[1];
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          measurements: analysis.measurements,
-          imageBase64,
-        }),
-      });
-      if (!res.ok) throw new Error();
-      const data: { assessment: Assessment; source: "ai" | "baseline" } =
-        await res.json();
-      const { markers, numberByArea } = buildAnnotations(
-        data.assessment.areas,
-        analysis.landmarks,
-      );
-      setAnalysis({
-        ...analysis,
-        assessment: data.assessment,
-        source: data.source,
-        markers,
-        numberByArea,
-      });
-    } catch {
-      // Keep the baseline result; surface a gentle note only.
-      setError("We couldn't take a closer look just now — here's your initial read.");
-    } finally {
-      setDeeperLoading(false);
     }
   }
 
@@ -149,7 +118,28 @@ export function ScanFlow() {
       )}
 
       {step === "analyzing" && (
-        <p className="py-12 text-center text-neutral-500">Taking a look…</p>
+        <div className="relative">
+          {photo ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photo.dataUrl}
+                alt=""
+                className="w-full rounded-2xl opacity-80"
+              />
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl bg-black/10">
+                <span className="size-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                <p className="text-sm font-medium text-white drop-shadow">
+                  Reading your features…
+                </p>
+              </div>
+            </>
+          ) : (
+            <p className="py-12 text-center text-neutral-500">
+              Reading your features…
+            </p>
+          )}
+        </div>
       )}
 
       {step === "result" && photo && analysis && (
@@ -162,27 +152,12 @@ export function ScanFlow() {
             active={active}
             onSelectArea={setActive}
           />
-          {error && <p className="text-sm text-amber-700">{error}</p>}
-          {deeperLoading && (
-            <div className="flex items-center gap-3 rounded-xl border border-[var(--accent)]/40 bg-[var(--accent)]/5 px-4 py-3">
-              <span className="size-4 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
-              <p className="text-sm text-neutral-600">
-                Taking a closer look at your photo — just a moment…
-              </p>
-            </div>
-          )}
           <AssessmentResult
             assessment={analysis.assessment}
             numberByArea={analysis.numberByArea}
             active={active}
             onSetActive={setActive}
             onBook={() => setStep("book")}
-            onDeeper={
-              analysis.source === "baseline"
-                ? () => setConsentOpen(true)
-                : undefined
-            }
-            deeperLoading={deeperLoading}
           />
         </>
       )}
@@ -193,12 +168,6 @@ export function ScanFlow() {
           onDone={reset}
         />
       )}
-
-      <ConsentDialog
-        open={consentOpen}
-        onAccept={runDeeper}
-        onDecline={() => setConsentOpen(false)}
-      />
     </div>
   );
 }

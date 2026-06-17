@@ -83,7 +83,8 @@ export function PhotoCapture({ onCapture }: Props) {
     <div className="flex flex-col items-center gap-5 text-center">
       <p className="max-w-xs text-sm text-neutral-500">
         Look straight at the camera, somewhere bright, with a relaxed
-        expression. Your photo stays on your device.
+        expression. Your photo is only used to create your result — we
+        don&apos;t keep it.
       </p>
       <div className="flex flex-col gap-3 sm:flex-row">
         <button

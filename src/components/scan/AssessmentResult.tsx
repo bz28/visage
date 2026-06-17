@@ -10,8 +10,6 @@ interface Props {
   active: string | null;
   onSetActive: (area: string | null) => void;
   onBook: () => void;
-  onDeeper?: () => void;
-  deeperLoading?: boolean;
 }
 
 const confidenceLabel: Record<string, string> = {
@@ -26,8 +24,6 @@ export function AssessmentResult({
   active,
   onSetActive,
   onBook,
-  onDeeper,
-  deeperLoading,
 }: Props) {
   // Unique areas in marker order, for the chip row.
   const uniqueAreas = assessment.areas.filter(
@@ -106,15 +102,6 @@ export function AssessmentResult({
         >
           Book a consultation
         </button>
-        {onDeeper && (
-          <button
-            onClick={onDeeper}
-            disabled={deeperLoading}
-            className="rounded-full border border-neutral-300 px-7 py-3 font-medium disabled:opacity-50"
-          >
-            {deeperLoading ? "One moment…" : "Take a closer look"}
-          </button>
-        )}
       </div>
 
       <p className="text-xs leading-relaxed text-neutral-400">{DISCLAIMER}</p>
