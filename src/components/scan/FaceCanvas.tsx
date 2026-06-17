@@ -11,6 +11,8 @@ interface Props {
   markers: Marker[];
   /** Area to emphasize (hovered/tapped in the list). */
   active?: string | null;
+  /** Called when a marker on the photo is tapped (null if tapped empty space). */
+  onSelectArea?: (area: string | null) => void;
 }
 
 // The user's own photo with numbered markers — never a fabricated "after".
@@ -20,8 +22,30 @@ export function FaceCanvas({
   imageHeight,
   markers,
   active,
+  onSelectArea,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
+    if (!onSelectArea) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scale = rect.width / imageWidth;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    // Find the nearest marker within a generous touch radius.
+    let hit: string | null = null;
+    let best = 24; // px
+    for (const m of markers) {
+      const d = Math.hypot(m.point.x * scale - x, m.point.y * scale - y);
+      if (d < best) {
+        best = d;
+        hit = m.area;
+      }
+    }
+    onSelectArea(hit && hit === active ? null : hit);
+  }
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -90,7 +114,8 @@ export function FaceCanvas({
   return (
     <canvas
       ref={canvasRef}
-      className="w-full rounded-2xl shadow-sm"
+      onClick={handleClick}
+      className={`w-full rounded-2xl shadow-sm ${onSelectArea ? "cursor-pointer" : ""}`}
       aria-label="Your photo with the areas an injector might discuss marked"
     />
   );

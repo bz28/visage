@@ -160,6 +160,7 @@ export function ScanFlow() {
             imageHeight={photo.height}
             markers={analysis.markers}
             active={active}
+            onSelectArea={setActive}
           />
           {error && <p className="text-sm text-amber-700">{error}</p>}
           {deeperLoading && (
