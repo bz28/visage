@@ -6,12 +6,14 @@ import { computeMeasurements } from "@/lib/measurements";
 import { baselineAssessment } from "@/lib/baseline";
 import { buildAnnotations, type Marker } from "@/lib/annotations";
 import type { Assessment } from "@/lib/assessment-schema";
-import { PhotoCapture } from "./PhotoCapture";
+import type { Intake as IntakeData } from "@/lib/intake-schema";
+import { Intake } from "./Intake";
+import { Capture, type CapturedImage } from "./Capture";
 import { FaceCanvas } from "./FaceCanvas";
 import { AssessmentResult } from "./AssessmentResult";
 import { BookConsult } from "./BookConsult";
 
-type Step = "capture" | "analyzing" | "result" | "book";
+type Step = "intake" | "capture" | "analyzing" | "result" | "book";
 
 interface Photo {
   dataUrl: string;
@@ -34,24 +36,32 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 export function ScanFlow() {
-  const [step, setStep] = useState<Step>("capture");
-  const [photo, setPhoto] = useState<Photo | null>(null);
+  const [step, setStep] = useState<Step>("intake");
+  const [intake, setIntake] = useState<IntakeData | null>(null);
+  const [front, setFront] = useState<Photo | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [active, setActive] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function onCapture(dataUrl: string) {
+  async function analyze(images: CapturedImage[]) {
     setError(null);
     setStep("analyzing");
     try {
-      const img = await loadImage(dataUrl);
+      const frontImg = images.find((i) => i.view === "front");
+      if (!frontImg) {
+        setError("We need a front photo to start.");
+        setStep("capture");
+        return;
+      }
+
+      const img = await loadImage(frontImg.dataUrl);
       const w = img.naturalWidth;
       const h = img.naturalHeight;
-      setPhoto({ dataUrl, width: w, height: h });
+      setFront({ dataUrl: frontImg.dataUrl, width: w, height: h });
 
       const result = await detectFace(img, w, h);
       if (result.status === "no-face") {
-        setError("We couldn't find a face. Try a straight-on photo in better light.");
+        setError("We couldn't find a face in the front photo. Try better light, straight on.");
         setStep("capture");
         return;
       }
@@ -63,9 +73,8 @@ export function ScanFlow() {
 
       const landmarks = result.landmarks;
       const measurements = computeMeasurements(landmarks);
-      const baseline = baselineAssessment(measurements);
+      const baseline = baselineAssessment(measurements, intake ?? undefined);
 
-      // AI read by default; fall back to the on-device baseline if it fails.
       let assessment = baseline;
       try {
         const res = await fetch("/api/analyze", {
@@ -73,7 +82,11 @@ export function ScanFlow() {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             measurements,
-            imageBase64: dataUrl.split(",")[1],
+            intake: intake ?? undefined,
+            images: images.map((i) => ({
+              view: i.view,
+              base64: i.dataUrl.split(",")[1],
+            })),
           }),
         });
         if (res.ok) {
@@ -97,15 +110,25 @@ export function ScanFlow() {
   }
 
   function reset() {
-    setPhoto(null);
+    setIntake(null);
+    setFront(null);
     setAnalysis(null);
     setActive(null);
     setError(null);
-    setStep("capture");
+    setStep("intake");
   }
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
+      {step === "intake" && (
+        <Intake
+          onSubmit={(i) => {
+            setIntake(i);
+            setStep("capture");
+          }}
+        />
+      )}
+
       {step === "capture" && (
         <>
           {error && (
@@ -113,17 +136,17 @@ export function ScanFlow() {
               {error}
             </p>
           )}
-          <PhotoCapture onCapture={onCapture} />
+          <Capture onDone={analyze} />
         </>
       )}
 
       {step === "analyzing" && (
         <div className="relative">
-          {photo ? (
+          {front ? (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={photo.dataUrl}
+                src={front.dataUrl}
                 alt=""
                 className="w-full rounded-2xl opacity-80"
               />
@@ -142,12 +165,12 @@ export function ScanFlow() {
         </div>
       )}
 
-      {step === "result" && photo && analysis && (
+      {step === "result" && front && analysis && (
         <>
           <FaceCanvas
-            dataUrl={photo.dataUrl}
-            imageWidth={photo.width}
-            imageHeight={photo.height}
+            dataUrl={front.dataUrl}
+            imageWidth={front.width}
+            imageHeight={front.height}
             markers={analysis.markers}
             active={active}
             onSelectArea={setActive}

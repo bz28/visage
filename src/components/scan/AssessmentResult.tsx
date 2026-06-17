@@ -80,6 +80,14 @@ export function AssessmentResult({
                     <span className="font-medium text-neutral-600">Why: </span>
                     {a.why}
                   </p>
+                  {a.roughAmount && (
+                    <p className="mt-2 text-sm text-neutral-500">
+                      <span className="font-medium text-neutral-600">
+                        Roughly:{" "}
+                      </span>
+                      {a.roughAmount}
+                    </p>
+                  )}
                   <div className="mt-2 text-xs text-neutral-400">
                     {confidenceLabel[a.confidence]}
                   </div>

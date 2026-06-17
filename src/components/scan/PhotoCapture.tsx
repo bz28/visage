@@ -1,16 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { ViewKey } from "@/lib/views";
 
 interface Props {
+  view: ViewKey;
+  label: string;
+  instruction: string;
   onCapture: (dataUrl: string) => void;
+  onCancel?: () => void;
 }
 
 /**
- * Phone-first photo input: live camera, or upload an existing selfie. Nothing
- * is uploaded here — the photo stays on the device for the baseline read.
+ * Captures one view (camera or upload) with an on-screen guide + instruction so
+ * the photo is usable. Nothing uploads here — the parent collects the shots.
  */
-export function PhotoCapture({ onCapture }: Props) {
+export function PhotoCapture({
+  view,
+  label,
+  instruction,
+  onCapture,
+  onCancel,
+}: Props) {
   const [mode, setMode] = useState<"choose" | "camera">("choose");
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -29,7 +40,6 @@ export function PhotoCapture({ onCapture }: Props) {
       });
       streamRef.current = stream;
       setMode("camera");
-      // wait a tick for the video element to mount
       requestAnimationFrame(() => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -60,32 +70,64 @@ export function PhotoCapture({ onCapture }: Props) {
     reader.readAsDataURL(file);
   }
 
+  const guideClass =
+    view === "front"
+      ? "h-[72%] w-[58%] rounded-[48%]"
+      : "h-[72%] w-[46%] rounded-[44%]"; // narrower oval for side/angle
+
   if (mode === "camera") {
     return (
       <div className="flex flex-col items-center gap-4">
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          className="w-full max-w-sm -scale-x-100 rounded-2xl bg-black"
-        />
-        <button
-          onClick={snap}
-          className="rounded-full bg-foreground px-8 py-3 font-medium text-background"
-        >
-          Take photo
-        </button>
+        <div className="relative w-full max-w-sm">
+          <video
+            ref={videoRef}
+            playsInline
+            muted
+            className="w-full -scale-x-100 rounded-2xl bg-black"
+          />
+          {/* guide outline */}
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div
+              className={`border-2 border-white/70 ${guideClass}`}
+              style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.15)" }}
+            />
+          </div>
+          <p className="absolute bottom-3 left-0 right-0 text-center text-sm font-medium text-white drop-shadow">
+            {instruction}
+          </p>
+        </div>
+        <div className="flex gap-3">
+          {onCancel && (
+            <button
+              onClick={() => {
+                streamRef.current?.getTracks().forEach((t) => t.stop());
+                onCancel();
+              }}
+              className="rounded-full border border-neutral-300 px-6 py-3 font-medium"
+            >
+              Back
+            </button>
+          )}
+          <button
+            onClick={snap}
+            className="rounded-full bg-foreground px-8 py-3 font-medium text-background"
+          >
+            Take photo
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col items-center gap-5 text-center">
-      <p className="max-w-xs text-sm text-neutral-500">
-        Look straight at the camera, somewhere bright, with a relaxed
-        expression. Your photo is only used to create your result — we
-        don&apos;t keep it.
-      </p>
+      <div>
+        <h2 className="font-semibold">{label} photo</h2>
+        <p className="mx-auto mt-1 max-w-xs text-sm text-neutral-500">
+          {instruction} Your photo is only used to create your result — we
+          don&apos;t keep it.
+        </p>
+      </div>
       <div className="flex flex-col gap-3 sm:flex-row">
         <button
           onClick={startCamera}
@@ -97,9 +139,14 @@ export function PhotoCapture({ onCapture }: Props) {
           onClick={() => fileRef.current?.click()}
           className="rounded-full border border-neutral-300 px-7 py-3 font-medium"
         >
-          Upload a selfie
+          Upload a photo
         </button>
       </div>
+      {onCancel && (
+        <button onClick={onCancel} className="text-sm text-neutral-400 underline">
+          Back
+        </button>
+      )}
       <input
         ref={fileRef}
         type="file"
