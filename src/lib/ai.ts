@@ -1,5 +1,6 @@
 import "server-only";
 import { generateObject } from "ai";
+import { anthropic } from "@ai-sdk/anthropic";
 import {
   assessmentSchema,
   type Assessment,
@@ -11,10 +12,16 @@ import type { Measurements } from "./measurements-schema";
  * Sonnet 4.6 via the Vercel AI Gateway. Vision-capable and supports structured
  * output; the deterministic layer already supplies the hard measurements, so
  * the model only does soft-tissue reads + phrasing — Sonnet is plenty here and
- * ~half the cost of Opus. Bump to "anthropic/claude-opus-4-8" if the "why"
- * quality proves thin on real faces. Schema is enforced via `schema`.
+ * ~half the cost of Opus. Bump to opus-4-8 if the "why" quality proves thin on
+ * real faces. Schema is enforced via `schema`.
+ *
+ * If ANTHROPIC_API_KEY is set we call the Anthropic API directly; otherwise we
+ * fall through to the Vercel AI Gateway (OIDC on Vercel deployments). Either
+ * way, a failure falls back to the on-device baseline.
  */
-const MODEL = "anthropic/claude-sonnet-4-6";
+const MODEL = process.env.ANTHROPIC_API_KEY
+  ? anthropic("claude-sonnet-4-6")
+  : "anthropic/claude-sonnet-4-6";
 
 const SYSTEM = `You are a world-class aesthetic injector and facial-balance expert with deep customer empathy. You are reviewing a person's frontal photo to help them understand what an experienced injector would *notice and discuss* about their facial balance with dermal filler.
 

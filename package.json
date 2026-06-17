@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.85",
     "@mediapipe/tasks-vision": "^0.10.35",
     "@neondatabase/serverless": "^1.1.0",
     "ai": "^6.0.207",
