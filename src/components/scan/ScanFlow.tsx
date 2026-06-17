@@ -7,6 +7,7 @@ import { baselineAssessment } from "@/lib/baseline";
 import { buildAnnotations, type Marker } from "@/lib/annotations";
 import type { Assessment } from "@/lib/assessment-schema";
 import type { Intake as IntakeData } from "@/lib/intake-schema";
+import type { ViewKey } from "@/lib/views";
 import { Intake } from "./Intake";
 import { Capture, type CapturedImage } from "./Capture";
 import { FaceCanvas } from "./FaceCanvas";
@@ -38,6 +39,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 export function ScanFlow() {
   const [step, setStep] = useState<Step>("intake");
   const [intake, setIntake] = useState<IntakeData | null>(null);
+  const [photos, setPhotos] = useState<Partial<Record<ViewKey, string>>>({});
   const [front, setFront] = useState<Photo | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [active, setActive] = useState<string | null>(null);
@@ -45,6 +47,12 @@ export function ScanFlow() {
 
   async function analyze(images: CapturedImage[]) {
     setError(null);
+    // Remember the shots so a detection error doesn't wipe them.
+    setPhotos(
+      Object.fromEntries(images.map((i) => [i.view, i.dataUrl])) as Partial<
+        Record<ViewKey, string>
+      >,
+    );
     setStep("analyzing");
     try {
       const frontImg = images.find((i) => i.view === "front");
@@ -111,6 +119,7 @@ export function ScanFlow() {
 
   function reset() {
     setIntake(null);
+    setPhotos({});
     setFront(null);
     setAnalysis(null);
     setActive(null);
@@ -136,7 +145,7 @@ export function ScanFlow() {
               {error}
             </p>
           )}
-          <Capture onDone={analyze} />
+          <Capture initialPhotos={photos} onDone={analyze} />
         </>
       )}
 

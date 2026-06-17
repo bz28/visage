@@ -44,6 +44,7 @@ export function Intake({ onSubmit }: Props) {
   const [age, setAge] = useState<IntakeData["age"]>();
   const [budget, setBudget] = useState<IntakeData["budget"]>();
   const [heritage, setHeritage] = useState("");
+  const [priorTreatments, setPriorTreatments] = useState("");
 
   const toggleGoal = (g: string) =>
     setGoals((prev) =>
@@ -57,6 +58,7 @@ export function Intake({ onSubmit }: Props) {
       age,
       budget,
       heritage: heritage.trim() || undefined,
+      priorTreatments: priorTreatments.trim() || undefined,
     });
 
   return (
@@ -111,8 +113,19 @@ export function Intake({ onSubmit }: Props) {
       <Field label="Heritage / background (optional)">
         <input
           value={heritage}
+          maxLength={60}
           onChange={(e) => setHeritage(e.target.value)}
           placeholder="Helps us tailor to your features"
+          className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm"
+        />
+      </Field>
+
+      <Field label="Any past filler or tox? (optional)">
+        <input
+          value={priorTreatments}
+          maxLength={300}
+          onChange={(e) => setPriorTreatments(e.target.value)}
+          placeholder="e.g. lip filler last year"
           className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm"
         />
       </Field>

@@ -10,14 +10,19 @@ export interface CapturedImage {
 }
 
 interface Props {
+  /** Restore previously-captured photos (e.g. after a detection error). */
+  initialPhotos?: Partial<Record<ViewKey, string>>;
   onDone: (images: CapturedImage[]) => void;
 }
 
 // Front is required; side & angle are optional but make the read more accurate.
-export function Capture({ onDone }: Props) {
-  const [photos, setPhotos] = useState<Partial<Record<ViewKey, string>>>({});
-  // Start by taking the required front photo.
-  const [capturing, setCapturing] = useState<ViewKey | null>("front");
+export function Capture({ initialPhotos, onDone }: Props) {
+  const [photos, setPhotos] =
+    useState<Partial<Record<ViewKey, string>>>(initialPhotos ?? {});
+  // Start at the review screen if we already have a front photo; else capture it.
+  const [capturing, setCapturing] = useState<ViewKey | null>(
+    initialPhotos?.front ? null : "front",
+  );
 
   if (capturing) {
     const v = VIEWS.find((x) => x.key === capturing)!;
@@ -98,6 +103,10 @@ export function Capture({ onDone }: Props) {
       >
         See my read
       </button>
+      <p className="text-center text-xs text-neutral-400">
+        We use your photos only to create your result — we don&apos;t store
+        them.
+      </p>
     </div>
   );
 }

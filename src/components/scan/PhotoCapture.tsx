@@ -27,9 +27,13 @@ export function PhotoCapture({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    return () => streamRef.current?.getTracks().forEach((t) => t.stop());
+    return () => {
+      mountedRef.current = false;
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
   }, []);
 
   async function startCamera() {
@@ -38,6 +42,11 @@ export function PhotoCapture({
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: 1280, height: 1280 },
       });
+      if (!mountedRef.current) {
+        // unmounted while awaiting permission — don't leave the camera on
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       streamRef.current = stream;
       setMode("camera");
       requestAnimationFrame(() => {
