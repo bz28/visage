@@ -9,12 +9,17 @@
  */
 import type { Assessment, AssessmentArea } from "./assessment-schema";
 import type { Measurements } from "./measurements-schema";
+import type { Intake } from "./intake-schema";
 
-export function baselineAssessment(m: Measurements): Assessment {
+export function baselineAssessment(
+  m: Measurements,
+  intake?: Intake,
+): Assessment {
   const areas: AssessmentArea[] = [];
+  const masculine = intake?.look === "masculine";
 
-  // --- Lips ---
-  if (m.lipVerdict === "short") {
+  // --- Lips (a fuller lip is more commonly a feminine goal) ---
+  if (m.lipVerdict === "short" && !masculine) {
     areas.push({
       area: "lips",
       title: "Lip proportion",
