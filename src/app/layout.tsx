@@ -9,9 +9,9 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Visage — see what an injector would notice",
+  title: `${CLINIC.name} — see your features, then book a consultation`,
   description:
-    "Scan your face for an educational read on the filler areas an expert injector might discuss, then book a consult. A simulation, not medical advice.",
+    "Take a quick look at the areas we might explore together — and why — then book your consultation. A guide to start the conversation, not medical advice.",
 };
 
 export default function RootLayout({

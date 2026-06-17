@@ -20,7 +20,7 @@ export function baselineAssessment(m: Measurements): Assessment {
       title: "Lip proportion",
       observation:
         "Your upper and lower lip are close in height, which can read a little thin in balance.",
-      why: "Injectors often discuss a subtle lip enhancement to bring the lower lip toward the classic ~1.6:1 ratio that reads full but natural — usually starting conservatively.",
+      why: "We'd often suggest a subtle lip enhancement to bring the lower lip toward the natural ~1.6:1 ratio — full, never overdone.",
       confidence: "medium",
       priority: 2,
     });
@@ -29,7 +29,7 @@ export function baselineAssessment(m: Measurements): Assessment {
       area: "lips",
       title: "Lip balance",
       observation: "Your lower lip carries more height than the upper.",
-      why: "A small amount of upper-lip support is sometimes discussed to even the balance, rather than adding overall volume.",
+      why: "We might add a touch of support to the upper lip to even the balance, rather than more volume.",
       confidence: "medium",
       priority: 3,
     });
@@ -42,7 +42,7 @@ export function baselineAssessment(m: Measurements): Assessment {
       title: "Chin & lower third",
       observation:
         "Your lower third sits a touch shorter than the upper and middle thirds.",
-      why: "Chin filler is commonly discussed to lengthen and balance the lower third and define the profile. Projection is best confirmed from a side view in a consult.",
+      why: "We often use chin filler to lengthen and balance the lower third and sharpen the profile — though projection is best judged from the side, in person.",
       confidence: "low",
       priority: 1,
     });
@@ -55,7 +55,7 @@ export function baselineAssessment(m: Measurements): Assessment {
       title: "Jawline definition",
       observation:
         "Your jaw width is narrower relative to your cheekbones than the typical balanced range.",
-      why: "Jawline filler is often discussed to add definition and a cleaner angle — a popular, structure-led treatment, especially for a stronger profile.",
+      why: "We'd look at jawline filler to add definition and a cleaner angle — a popular, structure-led treatment for a stronger profile.",
       confidence: "low",
       priority: 2,
     });
@@ -68,7 +68,7 @@ export function baselineAssessment(m: Measurements): Assessment {
       title: "Subtle asymmetry",
       observation:
         "There's a mild left-right asymmetry, which is completely normal — almost everyone has some.",
-      why: "An injector may discuss small, targeted adjustments to even balance. This is best evaluated in person.",
+      why: "We can sometimes even this out with small, targeted adjustments — best judged in person.",
       confidence: "low",
       priority: 5,
     });
@@ -77,8 +77,8 @@ export function baselineAssessment(m: Measurements): Assessment {
   areas.sort((a, b) => a.priority - b.priority);
 
   const summary = areas.length
-    ? "Here's what a skilled injector would likely notice about your facial balance. These are starting points for a conversation, not a plan."
-    : "Your proportions read well-balanced overall. An injector might still discuss subtle, optional refinements in person.";
+    ? "Here are a few things we might talk through, based on your proportions. It's just a starting point — your features are best read in person, which is what a consultation's for."
+    : "Your features read beautifully balanced — there's nothing we'd push. If you're curious, we might still point out a subtle refinement or two in person.";
 
   return { summary, areas };
 }

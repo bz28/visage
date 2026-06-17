@@ -1,15 +1,14 @@
-/**
- * Maps an assessment area to a marker point on the user's own photo, computed
- * from their landmarks. We annotate the real face — we never fabricate an
- * "after" image (see CLAUDE.md / the v1 framing).
- */
+// Maps assessment areas to numbered markers on the user's own photo (never a
+// fabricated "after"). The number ties each dot to its list item in the UI.
 import { KEY, REGIONS, type Pt } from "./landmarks";
 import type { AssessmentArea } from "./assessment-schema";
 
 export interface Marker {
   area: AssessmentArea["area"];
-  /** Pixel position to drop the marker, in source-image coordinates. */
+  /** Pixel position in source-image coordinates. */
   point: Pt;
+  /** 1-based number shown in the dot and on the matching list item. */
+  n: number;
 }
 
 const centroid = (lm: Pt[], idx: readonly number[]): Pt => {
@@ -21,7 +20,7 @@ const centroid = (lm: Pt[], idx: readonly number[]): Pt => {
 
 const mid = (a: Pt, b: Pt): Pt => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
-export function markerFor(area: AssessmentArea["area"], lm: Pt[]): Marker {
+function pointFor(area: AssessmentArea["area"], lm: Pt[]): Pt {
   let point: Pt = lm[KEY.menton];
   switch (area) {
     case "lips":
@@ -43,17 +42,25 @@ export function markerFor(area: AssessmentArea["area"], lm: Pt[]): Marker {
       point = lm[KEY.templeL];
       break;
   }
-  return { area, point };
+  return point;
 }
 
-export function markersFor(areas: AssessmentArea[], lm: Pt[]): Marker[] {
-  // De-dupe by area so we don't stack two markers on the same spot.
-  const seen = new Set<string>();
-  const out: Marker[] = [];
+/**
+ * Build markers + an area→number map from an assessment. Areas are numbered in
+ * list order; duplicates of an area share one marker/number (so two "chin"
+ * items both point at dot 2).
+ */
+export function buildAnnotations(
+  areas: AssessmentArea[],
+  lm: Pt[],
+): { markers: Marker[]; numberByArea: Record<string, number> } {
+  const numberByArea: Record<string, number> = {};
+  const markers: Marker[] = [];
   for (const a of areas) {
-    if (seen.has(a.area)) continue;
-    seen.add(a.area);
-    out.push(markerFor(a.area, lm));
+    if (numberByArea[a.area] != null) continue;
+    const n = markers.length + 1;
+    numberByArea[a.area] = n;
+    markers.push({ area: a.area, point: pointFor(a.area, lm), n });
   }
-  return out;
+  return { markers, numberByArea };
 }

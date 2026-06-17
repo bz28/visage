@@ -1,13 +1,5 @@
-/**
- * Face-landmark detection via MediaPipe Face Landmarker.
- *
- * Runs entirely in the browser (WASM). The baseline deterministic assessment
- * uses only these landmarks, so the photo never has to leave the device unless
- * the user opts into the deeper AI read (see lib/ai.ts).
- *
- * The model returns 478 points (468 face mesh + 10 iris). We expose the named
- * indices the measurement module needs in KEY / REGIONS below.
- */
+// In-browser face-landmark detection (MediaPipe, WASM). Returns 478 points
+// (468 face mesh + 10 iris); KEY/REGIONS below name the ones we use.
 import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 
 const WASM_CDN =
@@ -78,7 +70,7 @@ function getLandmarker(): Promise<FaceLandmarker> {
     landmarkerPromise = (async () => {
       const vision = await FilesetResolver.forVisionTasks(WASM_CDN);
       return FaceLandmarker.createFromOptions(vision, {
-        baseOptions: { modelAssetPath: MODEL_URL, delegate: "GPU" },
+        baseOptions: { modelAssetPath: MODEL_URL, delegate: "CPU" },
         runningMode: "IMAGE",
         // Detect up to 2 so we can warn when more than one face is in frame.
         numFaces: 2,

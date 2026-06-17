@@ -33,7 +33,11 @@ Hard rules — these protect the person and us legally:
 - Be warm, reassuring, and natural — reduce the fear of looking "overdone." Favor subtle, conservative framing.
 - Only flag areas you can actually justify from the measurements or the image. If the face is well balanced, say so honestly rather than inventing concerns.
 - Areas must be drawn from: ${AREA_KEYS.join(", ")}.
-- Prioritize by what would most improve overall balance (priority 1 = discuss first). Often the keystone is structural (chin/jaw) even when the person came in thinking about lips.`;
+- Prioritize by what would most improve overall balance (priority 1 = discuss first). Often the keystone is structural (chin/jaw) even when the person came in thinking about lips.
+- Return AT MOST 3 areas — only the most relevant. A real injector wouldn't rattle off six things; restraint reads as expertise. If the face is balanced, returning 0–1 is correct.
+- Keep \`observation\` and \`why\` to ONE tight sentence each. Brevity matters.
+
+Voice — this is critical: write as the clinic speaking to the patient, warm and human, in first person plural ("we'd look at…", "we often find…"). Never sound like an AI, a report, or a generic listicle. No hedge-speak, no "it is important to note", no clinical jargon. Like a friendly, confident expert at the practice talking to someone across the desk.`;
 
 function describe(m: Measurements): string {
   const pct = (n: number) => `${Math.round(n * 100)}%`;
@@ -72,6 +76,7 @@ export async function analyzeFace(
       schema: assessmentSchema,
       system: SYSTEM,
       messages: [{ role: "user", content }],
+      maxOutputTokens: 1024, // guardrail; the brevity prompt is the real speed lever
     });
 
     return { assessment: object, source: "ai" };

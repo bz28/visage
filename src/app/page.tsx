@@ -9,12 +9,12 @@ export default function Home() {
           {CLINIC.name}
         </p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-          See what an expert injector would notice
+          See your features the way we do
         </h1>
         <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-neutral-500">
-          Scan your face for an educational read on the filler areas worth
-          discussing — and why. A simulation to start the conversation, not
-          medical advice.
+          Take a quick look and we&apos;ll show you the areas we might explore
+          together — and why. Consider it the start of a conversation, best
+          continued in person.
         </p>
       </header>
 

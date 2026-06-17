@@ -9,14 +9,11 @@ interface Props {
   imageWidth: number;
   imageHeight: number;
   markers: Marker[];
-  /** Area to emphasize (e.g. the one the user is hovering in the list). */
+  /** Area to emphasize (hovered/tapped in the list). */
   active?: string | null;
 }
 
-/**
- * Draws the user's own photo with annotation markers over the flagged areas.
- * We annotate the real face — never a fabricated "after".
- */
+// The user's own photo with numbered markers — never a fabricated "after".
 export function FaceCanvas({
   dataUrl,
   imageWidth,
@@ -47,30 +44,43 @@ export function FaceCanvas({
       ctx.clearRect(0, 0, cssWidth, cssHeight);
       ctx.drawImage(img, 0, 0, cssWidth, cssHeight);
 
+      const accent =
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--accent")
+          .trim() || "#b8895f";
+
       for (const m of markers) {
         const x = m.point.x * scale;
         const y = m.point.y * scale;
         const isActive = active === m.area;
-        const r = isActive ? 11 : 8;
+        const r = isActive ? 15 : 12;
 
+        // numbered accent dot — always legible, so the dot means something at rest
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fillStyle = isActive
-          ? "rgba(255,255,255,0.95)"
-          : "rgba(255,255,255,0.7)";
+        ctx.fillStyle = accent;
+        ctx.globalAlpha = isActive ? 1 : 0.9;
         ctx.fill();
+        ctx.globalAlpha = 1;
         ctx.lineWidth = isActive ? 3 : 2;
-        ctx.strokeStyle = isActive ? "#0f0f0f" : "#3f3f3f";
+        ctx.strokeStyle = "#fff";
         ctx.stroke();
+
+        ctx.fillStyle = "#fff";
+        ctx.font = `700 ${isActive ? 15 : 12}px ui-sans-serif, system-ui, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(m.n), x, y + 0.5);
 
         if (isActive) {
           const label = AREA_LABELS[m.area];
           ctx.font = "600 13px ui-sans-serif, system-ui, sans-serif";
+          ctx.textAlign = "left";
           const w = ctx.measureText(label).width + 16;
           ctx.fillStyle = "rgba(15,15,15,0.9)";
-          ctx.fillRect(x + 14, y - 13, w, 26);
+          ctx.fillRect(x + r + 4, y - 13, w, 26);
           ctx.fillStyle = "#fff";
-          ctx.fillText(label, x + 22, y + 5);
+          ctx.fillText(label, x + r + 12, y + 1);
         }
       }
     };

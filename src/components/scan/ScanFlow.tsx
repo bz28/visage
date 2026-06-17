@@ -5,7 +5,7 @@ import { detectFace, type Pt } from "@/lib/landmarks";
 import { computeMeasurements } from "@/lib/measurements";
 import type { Measurements } from "@/lib/measurements-schema";
 import { baselineAssessment } from "@/lib/baseline";
-import { markersFor, type Marker } from "@/lib/annotations";
+import { buildAnnotations, type Marker } from "@/lib/annotations";
 import type { Assessment } from "@/lib/assessment-schema";
 import { PhotoCapture } from "./PhotoCapture";
 import { FaceCanvas } from "./FaceCanvas";
@@ -26,6 +26,7 @@ interface Analysis {
   assessment: Assessment;
   source: "ai" | "baseline";
   markers: Marker[];
+  numberByArea: Record<string, number>;
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -71,13 +72,17 @@ export function ScanFlow() {
 
       const measurements = computeMeasurements(result.landmarks);
       const assessment = baselineAssessment(measurements);
-      const markers = markersFor(assessment.areas, result.landmarks);
+      const { markers, numberByArea } = buildAnnotations(
+        assessment.areas,
+        result.landmarks,
+      );
       setAnalysis({
         landmarks: result.landmarks,
         measurements,
         assessment,
         source: "baseline",
         markers,
+        numberByArea,
       });
       setStep("result");
     } catch {
@@ -103,15 +108,20 @@ export function ScanFlow() {
       if (!res.ok) throw new Error();
       const data: { assessment: Assessment; source: "ai" | "baseline" } =
         await res.json();
+      const { markers, numberByArea } = buildAnnotations(
+        data.assessment.areas,
+        analysis.landmarks,
+      );
       setAnalysis({
         ...analysis,
         assessment: data.assessment,
         source: data.source,
-        markers: markersFor(data.assessment.areas, analysis.landmarks),
+        markers,
+        numberByArea,
       });
     } catch {
       // Keep the baseline result; surface a gentle note only.
-      setError("The deeper read isn't available right now — here's your on-device read.");
+      setError("We couldn't take a closer look just now — here's your initial read.");
     } finally {
       setDeeperLoading(false);
     }
@@ -139,9 +149,7 @@ export function ScanFlow() {
       )}
 
       {step === "analyzing" && (
-        <p className="py-12 text-center text-neutral-500">
-          Reading your facial balance…
-        </p>
+        <p className="py-12 text-center text-neutral-500">Taking a look…</p>
       )}
 
       {step === "result" && photo && analysis && (
@@ -154,10 +162,19 @@ export function ScanFlow() {
             active={active}
           />
           {error && <p className="text-sm text-amber-700">{error}</p>}
+          {deeperLoading && (
+            <div className="flex items-center gap-3 rounded-xl border border-[var(--accent)]/40 bg-[var(--accent)]/5 px-4 py-3">
+              <span className="size-4 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+              <p className="text-sm text-neutral-600">
+                Taking a closer look at your photo — just a moment…
+              </p>
+            </div>
+          )}
           <AssessmentResult
             assessment={analysis.assessment}
-            source={analysis.source}
-            onHoverArea={setActive}
+            numberByArea={analysis.numberByArea}
+            active={active}
+            onSetActive={setActive}
             onBook={() => setStep("book")}
             onDeeper={
               analysis.source === "baseline"

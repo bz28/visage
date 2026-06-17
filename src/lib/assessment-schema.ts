@@ -46,7 +46,7 @@ export const assessmentSchema = z.object({
   summary: z
     .string()
     .describe(
-      "2-3 sentences, warm and plain, framing what an injector would notice. Education, never a promise.",
+      "1-2 sentences in the clinic's warm first-person voice ('we'), like a friendly expert greeting the patient. A gentle opener that frames these as things worth talking through together in person — not a verdict or promise. No AI/report tone.",
     ),
   areas: z
     .array(areaSchema)
@@ -56,4 +56,4 @@ export const assessmentSchema = z.object({
 export type Assessment = z.infer<typeof assessmentSchema>;
 
 export const DISCLAIMER =
-  "This is an educational simulation of what an injector might discuss — not medical advice, a diagnosis, or a guaranteed result. Only a licensed provider can tell you what's right for you.";
+  "This is a guide to start the conversation — not medical advice, and not always right. The only real assessment is an in-person one with our team.";

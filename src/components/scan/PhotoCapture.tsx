@@ -82,8 +82,8 @@ export function PhotoCapture({ onCapture }: Props) {
   return (
     <div className="flex flex-col items-center gap-5 text-center">
       <p className="max-w-xs text-sm text-neutral-500">
-        Face the camera straight on, in good light, with a relaxed expression.
-        Your photo stays on your device for the first read.
+        Look straight at the camera, somewhere bright, with a relaxed
+        expression. Your photo stays on your device.
       </p>
       <div className="flex flex-col gap-3 sm:flex-row">
         <button
