@@ -31,6 +31,7 @@ function describe(m: Measurements): string {
   return [
     `Facial thirds (ideal ~33% each): upper ${pct(m.thirds.upper)}, middle ${pct(m.thirds.middle)}, lower ${pct(m.thirds.lower)} (lower third reads "${m.lowerThird}").`,
     `Lip ratio lower:upper = ${m.lipRatio.toFixed(2)} (aesthetic ideal ~1.6; reads "${m.lipVerdict}").`,
+    `Lower-face split (nose-base→mouth : mouth→chin) = ${m.upperToLowerLip.toFixed(2)} (balanced ~0.5).`,
     `Jaw-to-cheekbone width = ${m.jawToCheek.toFixed(2)} (balanced ~0.70–0.75; reads "${m.jawVerdict}").`,
     `Facial asymmetry index = ${m.asymmetry.toFixed(3)} (0 = symmetric; >0.08 is noticeable).`,
   ].join("\n");
@@ -66,7 +67,12 @@ export async function analyzeFace(
 
     return { assessment: object, source: "ai" };
   } catch (err) {
-    console.error("[analyzeFace] AI call failed, using baseline:", err);
+    // Log only the message — the full error object (e.g. APICallError) can carry
+    // requestBodyValues including the base64 photo. Never log that (see CLAUDE.md).
+    console.error(
+      "[analyzeFace] AI call failed, using baseline:",
+      err instanceof Error ? err.message : String(err),
+    );
     return { assessment: baseline, source: "baseline" };
   }
 }

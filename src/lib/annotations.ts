@@ -40,7 +40,7 @@ export function markerFor(area: AssessmentArea["area"], lm: Pt[]): Marker {
       point = mid(lm[KEY.eyeInnerL], lm[KEY.eyeOuterL]);
       break;
     case "temples":
-      point = lm[KEY.zygionL];
+      point = lm[KEY.templeL];
       break;
   }
   return { area, point };

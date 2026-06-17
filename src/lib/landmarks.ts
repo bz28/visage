@@ -56,6 +56,7 @@ export const KEY = {
   alarL: 278, // left nostril edge
   irisR: 468, // right iris center
   irisL: 473, // left iris center
+  templeL: 251, // left temple (upper-side of forehead)
 } as const;
 
 /** Outer lip contour, for drawing the lip annotation marker. */
