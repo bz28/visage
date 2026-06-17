@@ -8,11 +8,13 @@ import {
 import type { Measurements } from "./measurements-schema";
 
 /**
- * Opus 4.8 via the Vercel AI Gateway. Vision-capable, intelligence-sensitive
- * aesthetic judgment → Opus, not Sonnet. Structured output is enforced by
- * passing `schema`, so the model must return our education-framed shape.
+ * Sonnet 4.6 via the Vercel AI Gateway. Vision-capable and supports structured
+ * output; the deterministic layer already supplies the hard measurements, so
+ * the model only does soft-tissue reads + phrasing — Sonnet is plenty here and
+ * ~half the cost of Opus. Bump to "anthropic/claude-opus-4-8" if the "why"
+ * quality proves thin on real faces. Schema is enforced via `schema`.
  */
-const MODEL = "anthropic/claude-opus-4-8";
+const MODEL = "anthropic/claude-sonnet-4-6";
 
 const SYSTEM = `You are a world-class aesthetic injector and facial-balance expert with deep customer empathy. You are reviewing a person's frontal photo to help them understand what an experienced injector would *notice and discuss* about their facial balance with dermal filler.
 
