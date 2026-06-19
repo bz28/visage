@@ -35,14 +35,33 @@ export function BookConsult({ interests, onDone }: Props) {
 
   if (status === "done") {
     return (
-      <div className="flex flex-col items-center gap-4 py-8 text-center">
-        <h2 className="text-xl font-semibold">You&apos;re all set</h2>
-        <p className="max-w-xs text-sm text-neutral-600">
-          {CLINIC.name} will reach out to confirm your consultation. {CLINIC.bookingNote}
+      <div className="flex flex-col items-center gap-4 rounded-3xl border border-border bg-surface p-8 py-12 text-center shadow-sm">
+        <div className="flex size-14 items-center justify-center rounded-full bg-[var(--accent)]/10 text-[var(--accent)]">
+          <svg
+            viewBox="0 0 24 24"
+            className="size-7"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="m4.5 12.75 6 6 9-13.5"
+            />
+          </svg>
+        </div>
+        <h2 className="font-display text-2xl font-semibold">
+          You&apos;re all set
+        </h2>
+        <p className="max-w-sm text-sm leading-relaxed text-neutral-600">
+          Your request is in. {CLINIC.bookingNote} Keep an eye on your inbox or
+          phone.
         </p>
         <button
           onClick={onDone}
-          className="mt-2 rounded-full border border-neutral-300 px-6 py-2.5 font-medium"
+          className="mt-2 rounded-full border border-neutral-300 px-6 py-2.5 font-medium transition-colors hover:border-neutral-400"
         >
           Start over
         </button>
@@ -51,46 +70,60 @@ export function BookConsult({ interests, onDone }: Props) {
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
+    <form
+      onSubmit={submit}
+      className="flex flex-col gap-5 rounded-3xl border border-border bg-surface p-6 shadow-sm sm:p-8"
+    >
       <div>
-        <h2 className="text-xl font-semibold">Book with {CLINIC.name}</h2>
-        <p className="mt-1 text-sm text-neutral-500">{CLINIC.bookingNote}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--accent)]">
+          Last step
+        </p>
+        <h2 className="mt-2 font-display text-2xl font-semibold">
+          Book with {CLINIC.name}
+        </h2>
+        <p className="mt-1.5 text-sm leading-relaxed text-neutral-500">
+          {CLINIC.bookingNote}
+        </p>
       </div>
 
       {interests.length > 0 && (
-        <p className="text-sm text-neutral-500">
-          Interested in:{" "}
-          <span className="text-neutral-700">
-            {interests.map((i) => AREA_LABELS[i as keyof typeof AREA_LABELS] ?? i).join(", ")}
-          </span>
-        </p>
+        <div className="rounded-2xl bg-[var(--accent)]/5 px-4 py-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">
+            We&apos;ll have ready to discuss
+          </p>
+          <p className="mt-1 text-sm text-neutral-700">
+            {interests
+              .map((i) => AREA_LABELS[i as keyof typeof AREA_LABELS] ?? i)
+              .join(" · ")}
+          </p>
+        </div>
       )}
 
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-neutral-600">
         Name
         <input
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="rounded-lg border border-neutral-300 px-3 py-2.5"
+          className="rounded-lg border border-neutral-300 px-3 py-2.5 font-normal text-foreground transition-colors focus:border-[var(--accent)] focus:outline-none"
         />
       </label>
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-neutral-600">
         Email or phone
         <input
           required
           value={contact}
           onChange={(e) => setContact(e.target.value)}
-          className="rounded-lg border border-neutral-300 px-3 py-2.5"
+          className="rounded-lg border border-neutral-300 px-3 py-2.5 font-normal text-foreground transition-colors focus:border-[var(--accent)] focus:outline-none"
         />
       </label>
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1.5 text-sm font-medium text-neutral-600">
         Anything you&apos;d like them to know (optional)
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={3}
-          className="rounded-lg border border-neutral-300 px-3 py-2.5"
+          className="rounded-lg border border-neutral-300 px-3 py-2.5 font-normal text-foreground transition-colors focus:border-[var(--accent)] focus:outline-none"
         />
       </label>
 
@@ -103,10 +136,14 @@ export function BookConsult({ interests, onDone }: Props) {
       <button
         type="submit"
         disabled={status === "saving"}
-        className="rounded-full bg-foreground px-7 py-3 font-medium text-background disabled:opacity-50"
+        className="rounded-full bg-foreground px-7 py-3.5 font-medium text-background transition-transform active:scale-[0.99] disabled:opacity-50"
       >
         {status === "saving" ? "Sending…" : "Request consultation"}
       </button>
+      <p className="text-center text-xs leading-relaxed text-neutral-400">
+        No charge to book. A licensed injector reviews your photos and confirms
+        what&apos;s right for you — in person.
+      </p>
     </form>
   );
 }

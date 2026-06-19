@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# browser-agent test artifacts (Playwright MCP screenshots)
+.playwright-mcp/
+/desktop-*.png
+/v2-*.png
