@@ -63,10 +63,13 @@ export function Intake({ onSubmit }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 rounded-3xl border border-border bg-surface p-6 shadow-sm sm:p-8">
       <div>
-        <h2 className="text-lg font-semibold">A few quick questions</h2>
+        <h2 className="font-display text-xl font-semibold">
+          A few quick questions
+        </h2>
         <p className="mt-1 text-sm text-neutral-500">
-          So your read fits you — not a generic ideal. All optional.
+          So your read fits you — not a generic ideal. Every field is optional.
         </p>
       </div>
 
@@ -116,7 +119,7 @@ export function Intake({ onSubmit }: Props) {
           maxLength={60}
           onChange={(e) => setHeritage(e.target.value)}
           placeholder="Helps us tailor to your features"
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm"
+          className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm transition-colors focus:border-[var(--accent)] focus:outline-none"
         />
       </Field>
 
@@ -126,22 +129,23 @@ export function Intake({ onSubmit }: Props) {
           maxLength={300}
           onChange={(e) => setPriorTreatments(e.target.value)}
           placeholder="e.g. lip filler last year"
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm"
+          className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm transition-colors focus:border-[var(--accent)] focus:outline-none"
         />
       </Field>
+      </div>
 
-      <div className="sticky bottom-0 flex flex-col gap-2 bg-background/95 pb-3 pt-3 backdrop-blur">
+      <div className="flex flex-col gap-3">
         <button
           onClick={submit}
-          className="rounded-full bg-foreground px-7 py-3 font-medium text-background shadow-lg"
+          className="rounded-full bg-foreground px-7 py-4 font-medium text-background shadow-sm transition-transform active:scale-[0.99]"
         >
           Continue
         </button>
         <button
           onClick={() => onSubmit({ goals: [] })}
-          className="text-sm text-neutral-400 underline"
+          className="text-sm text-neutral-400 underline-offset-2 hover:text-neutral-600 hover:underline"
         >
-          Skip
+          Skip — just show me my read
         </button>
       </div>
     </div>

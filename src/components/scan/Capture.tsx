@@ -52,8 +52,8 @@ export function Capture({ initialPhotos, onDone }: Props) {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold">Your photos</h2>
-        <p className="mt-1 text-sm text-neutral-500">
+        <h2 className="font-display text-xl font-semibold">Your photos</h2>
+        <p className="mt-1.5 text-sm leading-relaxed text-neutral-500">
           The front photo is all we need. Adding a side and angle gives us a
           sharper, more accurate read.
         </p>

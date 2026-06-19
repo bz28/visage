@@ -153,10 +153,10 @@ export function PhotoCapture({
         <PoseIllustration view={view} size={80} />
       </div>
       <div>
-        <h2 className="font-semibold">{label} photo</h2>
-        <p className="mx-auto mt-1 max-w-xs text-sm text-neutral-500">
-          {instruction} Your photo is only used to create your result — we
-          don&apos;t keep it.
+        <h2 className="font-display text-xl font-semibold">{label} photo</h2>
+        <p className="mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-neutral-500">
+          {instruction}{" "}
+          Your photo is only used to create your result — we don&apos;t keep it.
         </p>
       </div>
       <div className="flex flex-col gap-3 sm:flex-row">
