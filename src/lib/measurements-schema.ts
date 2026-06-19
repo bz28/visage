@@ -28,6 +28,10 @@ export const measurementsSchema = z.object({
   jawToCheek: z.number(),
   jawVerdict: verdictSchema,
   asymmetry: z.number(),
+  /** Real-world scale from average interpupillary distance (~63mm). For rough size hints only. */
+  mmPerPx: z.number(),
+  /** Head-yaw proxy for the front shot: 0 = straight-on, higher = turned (lowers confidence). */
+  frontalTilt: z.number(),
 });
 
 export type Measurements = z.infer<typeof measurementsSchema>;

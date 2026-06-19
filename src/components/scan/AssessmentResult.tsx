@@ -80,6 +80,14 @@ export function AssessmentResult({
                     <span className="font-medium text-neutral-600">Why: </span>
                     {a.why}
                   </p>
+                  {a.roughAmount && (
+                    <p className="mt-2 text-sm text-neutral-500">
+                      <span className="font-medium text-neutral-600">
+                        Roughly:{" "}
+                      </span>
+                      {a.roughAmount}
+                    </p>
+                  )}
                   <div className="mt-2 text-xs text-neutral-400">
                     {confidenceLabel[a.confidence]}
                   </div>
@@ -95,14 +103,12 @@ export function AssessmentResult({
         </>
       )}
 
-      <div className="flex flex-col gap-3">
-        <button
-          onClick={onBook}
-          className="rounded-full bg-foreground px-7 py-3 font-medium text-background"
-        >
-          Book a consultation
-        </button>
-      </div>
+      <button
+        onClick={onBook}
+        className="sticky bottom-4 z-10 rounded-full bg-foreground px-7 py-3 font-medium text-background shadow-lg"
+      >
+        Book a consultation
+      </button>
 
       <p className="text-xs leading-relaxed text-neutral-400">{DISCLAIMER}</p>
     </div>
