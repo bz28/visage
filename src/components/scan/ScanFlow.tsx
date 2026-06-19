@@ -10,11 +10,22 @@ import type { Intake as IntakeData } from "@/lib/intake-schema";
 import type { ViewKey } from "@/lib/views";
 import { Intake } from "./Intake";
 import { Capture, type CapturedImage } from "./Capture";
+import { Analyzing } from "./Analyzing";
 import { FaceCanvas } from "./FaceCanvas";
 import { AssessmentResult } from "./AssessmentResult";
 import { BookConsult } from "./BookConsult";
+import { StepProgress } from "./StepProgress";
 
 type Step = "intake" | "capture" | "analyzing" | "result" | "book";
+
+// Map each internal step to a stage in the patient-facing progress indicator.
+const STAGE_INDEX: Record<Step, number> = {
+  intake: 0,
+  capture: 1,
+  analyzing: 1,
+  result: 2,
+  book: 3,
+};
 
 interface Photo {
   dataUrl: string;
@@ -127,87 +138,99 @@ export function ScanFlow() {
     setStep("intake");
   }
 
+  const shell =
+    step === "result"
+      ? "max-w-6xl"
+      : step === "intake" || step === "book"
+        ? "max-w-xl"
+        : "max-w-lg";
+
   return (
-    <div
-      className={`mx-auto flex w-full flex-col gap-6 ${
-        step === "result" ? "max-w-3xl" : "max-w-lg"
-      }`}
-    >
-      {step === "intake" && (
-        <Intake
-          onSubmit={(i) => {
-            setIntake(i);
-            setStep("capture");
-          }}
-        />
-      )}
+    <div className="mx-auto flex w-full flex-col items-center gap-8 sm:gap-10">
+      <StepProgress current={STAGE_INDEX[step]} />
 
-      {step === "capture" && (
-        <>
-          {error && (
-            <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              {error}
-            </p>
-          )}
-          <Capture initialPhotos={photos} onDone={analyze} />
-        </>
-      )}
+      <div className={`w-full ${shell}`}>
+        {step === "intake" && (
+          <div className="flex flex-col gap-8">
+            <header className="text-center">
+              <h1 className="font-display text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl">
+                See your features
+                <br />
+                the way we do
+              </h1>
+              <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-neutral-500">
+                A quick, private look at the areas we might explore together — and
+                why. Think of it as the start of a conversation, best continued in
+                person.
+              </p>
+            </header>
+            <Intake
+              onSubmit={(i) => {
+                setIntake(i);
+                setStep("capture");
+              }}
+            />
+          </div>
+        )}
 
-      {step === "analyzing" && (
-        <div className="relative">
-          {front ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={front.dataUrl}
-                alt=""
-                className="w-full rounded-2xl opacity-80"
-              />
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-2xl bg-black/10">
-                <span className="size-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                <p className="text-sm font-medium text-white drop-shadow">
-                  Reading your features…
-                </p>
+        {step === "capture" && (
+          <div className="flex flex-col gap-6">
+            {error && (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                {error}
+              </p>
+            )}
+            <Capture initialPhotos={photos} onDone={analyze} />
+          </div>
+        )}
+
+        {step === "analyzing" && <Analyzing dataUrl={front?.dataUrl} />}
+
+        {step === "result" && front && analysis && (
+          <div className="flex flex-col gap-7">
+            <header className="text-center md:text-left">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
+                Your read
+              </p>
+              <h1 className="mt-2 font-display text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+                Here&apos;s what we&apos;d explore together
+              </h1>
+              <p className="mx-auto mt-3 max-w-2xl text-[15px] leading-relaxed text-neutral-600 md:mx-0">
+                {analysis.assessment.summary}
+              </p>
+            </header>
+
+            <div className="flex flex-col gap-7 md:flex-row md:items-start md:gap-10">
+              <div className="md:sticky md:top-6 md:w-[52%] md:shrink-0">
+                <FaceCanvas
+                  dataUrl={front.dataUrl}
+                  imageWidth={front.width}
+                  imageHeight={front.height}
+                  markers={analysis.markers}
+                  active={active}
+                  onSelectArea={setActive}
+                />
               </div>
-            </>
-          ) : (
-            <p className="py-12 text-center text-neutral-500">
-              Reading your features…
-            </p>
-          )}
-        </div>
-      )}
-
-      {step === "result" && front && analysis && (
-        <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
-          <div className="md:sticky md:top-6 md:w-[44%] md:shrink-0">
-            <FaceCanvas
-              dataUrl={front.dataUrl}
-              imageWidth={front.width}
-              imageHeight={front.height}
-              markers={analysis.markers}
-              active={active}
-              onSelectArea={setActive}
-            />
+              <div className="md:flex-1">
+                <AssessmentResult
+                  assessment={analysis.assessment}
+                  numberByArea={analysis.numberByArea}
+                  active={active}
+                  onSetActive={setActive}
+                  onBook={() => setStep("book")}
+                />
+              </div>
+            </div>
           </div>
-          <div className="md:flex-1">
-            <AssessmentResult
-              assessment={analysis.assessment}
-              numberByArea={analysis.numberByArea}
-              active={active}
-              onSetActive={setActive}
-              onBook={() => setStep("book")}
-            />
-          </div>
-        </div>
-      )}
+        )}
 
-      {step === "book" && analysis && (
-        <BookConsult
-          interests={[...new Set(analysis.assessment.areas.map((a) => a.area))]}
-          onDone={reset}
-        />
-      )}
+        {step === "book" && analysis && (
+          <BookConsult
+            interests={[...new Set(analysis.assessment.areas.map((a) => a.area))]}
+            onDone={reset}
+          />
+        )}
+      </div>
     </div>
   );
 }

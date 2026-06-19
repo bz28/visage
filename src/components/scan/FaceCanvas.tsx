@@ -77,7 +77,13 @@ export function FaceCanvas({
       if (!ctx) return;
 
       const availW = wrap.clientWidth || imageWidth;
-      const maxH = Math.min(480, window.innerHeight * 0.5);
+      // Let the photo breathe on desktop (immersive read); stay capped on mobile
+      // so it never forces scroll past the fold.
+      const desktop = window.innerWidth >= 768;
+      const maxH = Math.min(
+        desktop ? 640 : 460,
+        window.innerHeight * (desktop ? 0.72 : 0.5),
+      );
       const scale = Math.min(availW / imageWidth, maxH / imageHeight);
       const cssW = imageWidth * scale;
       const cssH = imageHeight * scale;
