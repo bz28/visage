@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Marker } from "@/lib/annotations";
 import { AREA_LABELS } from "@/lib/assessment-schema";
 
@@ -16,6 +16,8 @@ interface Props {
 }
 
 // The user's own photo with numbered markers — never a fabricated "after".
+// Sizes to its container with a height cap so it fits a desktop column or a
+// capped mobile block without forcing scroll.
 export function FaceCanvas({
   dataUrl,
   imageWidth,
@@ -24,7 +26,10 @@ export function FaceCanvas({
   active,
   onSelectArea,
 }: Props) {
+  const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const [loaded, setLoaded] = useState(0);
 
   function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
     if (!onSelectArea) return;
@@ -34,9 +39,8 @@ export function FaceCanvas({
     const scale = rect.width / imageWidth;
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    // Find the nearest marker within a generous touch radius.
     let hit: string | null = null;
-    let best = 24; // px
+    let best = 24; // px touch radius
     for (const m of markers) {
       const d = Math.hypot(m.point.x * scale - x, m.point.y * scale - y);
       if (d < best) {
@@ -47,26 +51,46 @@ export function FaceCanvas({
     onSelectArea(hit && hit === active ? null : hit);
   }
 
+  // Load (or reload) the image only when the source changes.
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
     const img = new Image();
     img.onload = () => {
-      const cssWidth = canvas.clientWidth || imageWidth;
-      const scale = cssWidth / imageWidth;
-      const cssHeight = imageHeight * scale;
+      imgRef.current = img;
+      setLoaded((n) => n + 1);
+    };
+    img.src = dataUrl;
+    return () => {
+      imgRef.current = null;
+    };
+  }, [dataUrl]);
+
+  // Draw on load / marker change / resize.
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const canvas = canvasRef.current;
+    if (!wrap || !canvas) return;
+
+    function draw() {
+      const img = imgRef.current;
+      if (!wrap || !canvas || !img) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const availW = wrap.clientWidth || imageWidth;
+      const maxH = Math.min(480, window.innerHeight * 0.5);
+      const scale = Math.min(availW / imageWidth, maxH / imageHeight);
+      const cssW = imageWidth * scale;
+      const cssH = imageHeight * scale;
       const dpr = window.devicePixelRatio || 1;
 
-      canvas.width = cssWidth * dpr;
-      canvas.height = cssHeight * dpr;
-      canvas.style.height = `${cssHeight}px`;
+      canvas.width = cssW * dpr;
+      canvas.height = cssH * dpr;
+      canvas.style.width = `${cssW}px`;
+      canvas.style.height = `${cssH}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      ctx.clearRect(0, 0, cssWidth, cssHeight);
-      ctx.drawImage(img, 0, 0, cssWidth, cssHeight);
+      ctx.clearRect(0, 0, cssW, cssH);
+      ctx.drawImage(img, 0, 0, cssW, cssH);
 
       const accent =
         getComputedStyle(document.documentElement)
@@ -79,7 +103,6 @@ export function FaceCanvas({
         const isActive = active === m.area;
         const r = isActive ? 15 : 12;
 
-        // numbered accent dot — always legible, so the dot means something at rest
         ctx.beginPath();
         ctx.arc(x, y, r, 0, Math.PI * 2);
         ctx.fillStyle = accent;
@@ -107,16 +130,28 @@ export function FaceCanvas({
           ctx.fillText(label, x + r + 12, y + 1);
         }
       }
+    }
+
+    draw();
+    const ro = new ResizeObserver(() => draw());
+    ro.observe(wrap);
+    // ResizeObserver only watches width; also redraw on viewport-height changes
+    // (mobile URL bar show/hide) so the height cap stays current.
+    window.addEventListener("resize", draw);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", draw);
     };
-    img.src = dataUrl;
-  }, [dataUrl, imageWidth, imageHeight, markers, active]);
+  }, [markers, active, loaded, imageWidth, imageHeight]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      onClick={handleClick}
-      className={`w-full rounded-2xl shadow-sm ${onSelectArea ? "cursor-pointer" : ""}`}
-      aria-label="Your photo with the areas an injector might discuss marked"
-    />
+    <div ref={wrapRef} className="flex justify-center">
+      <canvas
+        ref={canvasRef}
+        onClick={handleClick}
+        className={`rounded-2xl shadow-sm ${onSelectArea ? "cursor-pointer" : ""}`}
+        aria-label="Your photo with the areas an injector might discuss marked"
+      />
+    </div>
   );
 }

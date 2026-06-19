@@ -55,6 +55,16 @@ export function computeMeasurements(lm: Pt[]): Measurements {
       rel(p(KEY.gonionR), p(KEY.gonionL), midline)) /
     3;
 
+  // --- Scale: average interpupillary distance is ~63mm ---
+  const ipdPx = dist(p(KEY.irisR), p(KEY.irisL)) || 1;
+  const mmPerPx = 63 / ipdPx;
+
+  // --- Frontal tilt (head yaw): nose-to-cheek width should match L/R when straight-on ---
+  const rightHalf = Math.abs(midline.x - p(KEY.zygionR).x);
+  const leftHalf = Math.abs(p(KEY.zygionL).x - midline.x);
+  const frontalTilt =
+    Math.abs(rightHalf - leftHalf) / ((rightHalf + leftHalf) / 2 || 1);
+
   return {
     thirds: { upper, middle, lower },
     lowerThird:
@@ -67,5 +77,7 @@ export function computeMeasurements(lm: Pt[]): Measurements {
     jawVerdict:
       jawToCheek < 0.68 ? "narrow" : jawToCheek > 0.8 ? "wide" : "balanced",
     asymmetry,
+    mmPerPx,
+    frontalTilt,
   };
 }

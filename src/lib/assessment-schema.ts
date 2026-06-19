@@ -34,6 +34,8 @@ export const areaSchema = z.object({
   confidence: z.enum(["low", "medium", "high"]),
   /** 1 = discuss first. Lower sorts earlier. */
   priority: z.number().int().min(1).max(10),
+  /** Optional, vague, education-only sense of scale (e.g. "often around one syringe"). Omit if unsure. */
+  roughAmount: z.string().optional(),
 });
 
 export type AssessmentArea = z.infer<typeof areaSchema>;

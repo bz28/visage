@@ -18,9 +18,9 @@ export interface Clinic {
 }
 
 export const CLINIC: Clinic = {
-  name: "Lumière Aesthetics",
+  name: "Ben's Lab",
   accent: "#b8895f",
-  consultEmail: "consults@example.com",
+  consultEmail: "consults@benslab.example",
   bookingNote:
     "A licensed injector will review your photos and reach out to confirm what's right for you.",
 };
