@@ -5,19 +5,19 @@ export const VIEWS = [
     key: "front",
     label: "Front",
     required: true,
-    instruction: "Look straight at the camera, relaxed.",
+    instruction: "Look straight at the camera.",
   },
   {
     key: "profile",
     label: "Side",
     required: false,
-    instruction: "Turn fully to your side (profile). Lets us judge projection.",
+    instruction: "Turn to one side — either way.",
   },
   {
     key: "threequarter",
     label: "Angle",
     required: false,
-    instruction: "Turn about halfway to the side. Shows cheek & contour.",
+    instruction: "Turn about halfway to one side.",
   },
 ] as const;
 

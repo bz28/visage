@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { VIEWS, type ViewKey } from "@/lib/views";
 import { PhotoCapture } from "./PhotoCapture";
+import { PoseIllustration } from "./PoseIllustration";
 
 export interface CapturedImage {
   view: ViewKey;
@@ -66,10 +67,16 @@ export function Capture({ initialPhotos, onDone }: Props) {
               key={v.key}
               className="flex items-center gap-3 rounded-xl border border-neutral-200 p-3"
             >
-              <div className="size-16 shrink-0 overflow-hidden rounded-lg bg-neutral-100">
-                {url && (
+              <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-100">
+                {url ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img src={url} alt="" className="size-full object-cover" />
+                ) : (
+                  <PoseIllustration
+                    view={v.key}
+                    size={44}
+                    className="text-[var(--accent)]"
+                  />
                 )}
               </div>
               <div className="min-w-0 flex-1">

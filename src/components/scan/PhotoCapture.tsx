@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ViewKey } from "@/lib/views";
+import { PoseIllustration } from "./PoseIllustration";
 
 interface Props {
   view: ViewKey;
@@ -82,11 +83,6 @@ export function PhotoCapture({
     reader.readAsDataURL(file);
   }
 
-  const guideClass =
-    view === "front"
-      ? "h-[72%] w-[58%] rounded-[48%]"
-      : "h-[72%] w-[46%] rounded-[44%]"; // narrower oval for side/angle
-
   if (mode === "camera") {
     return (
       <div className="flex flex-col items-center gap-4">
@@ -97,16 +93,30 @@ export function PhotoCapture({
             muted
             className="w-full -scale-x-100 rounded-2xl bg-black"
           />
-          {/* guide outline */}
+          {/* Pose cue overlay */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div
-              className={`border-2 border-white/70 ${guideClass}`}
-              style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.15)" }}
-            />
+            {view === "front" ? (
+              // Front: an oval to fit the face in.
+              <div
+                className="h-[72%] w-[58%] rounded-[48%] border-2 border-white/70"
+                style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.15)" }}
+              />
+            ) : (
+              // Side / angle: a centered oval would mislead, so show a
+              // translucent ghost of the target pose instead.
+              <PoseIllustration
+                view={view}
+                size={180}
+                className="text-white/40"
+              />
+            )}
           </div>
-          <p className="absolute bottom-3 left-0 right-0 text-center text-sm font-medium text-white drop-shadow">
-            {instruction}
-          </p>
+          {/* Label / instruction — always legible over the video. */}
+          <div className="absolute bottom-0 left-0 right-0 rounded-b-2xl bg-gradient-to-t from-black/60 to-transparent px-4 pb-3 pt-8 text-center">
+            <p className="text-sm font-medium text-white drop-shadow">
+              {view === "front" ? "Fit your face in the oval." : instruction}
+            </p>
+          </div>
         </div>
         <div className="flex gap-3">
           {onCancel && (
@@ -133,6 +143,12 @@ export function PhotoCapture({
 
   return (
     <div className="flex flex-col items-center gap-5 text-center">
+      <div
+        className="flex size-24 items-center justify-center rounded-full text-[var(--accent)]"
+        style={{ backgroundColor: "color-mix(in srgb, var(--accent) 10%, transparent)" }}
+      >
+        <PoseIllustration view={view} size={80} />
+      </div>
       <div>
         <h2 className="font-semibold">{label} photo</h2>
         <p className="mx-auto mt-1 max-w-xs text-sm text-neutral-500">
