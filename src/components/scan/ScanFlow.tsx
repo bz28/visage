@@ -175,23 +175,27 @@ export function ScanFlow() {
       )}
 
       {step === "result" && front && analysis && (
-        <>
-          <FaceCanvas
-            dataUrl={front.dataUrl}
-            imageWidth={front.width}
-            imageHeight={front.height}
-            markers={analysis.markers}
-            active={active}
-            onSelectArea={setActive}
-          />
-          <AssessmentResult
-            assessment={analysis.assessment}
-            numberByArea={analysis.numberByArea}
-            active={active}
-            onSetActive={setActive}
-            onBook={() => setStep("book")}
-          />
-        </>
+        <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
+          <div className="md:sticky md:top-6 md:w-[44%] md:shrink-0">
+            <FaceCanvas
+              dataUrl={front.dataUrl}
+              imageWidth={front.width}
+              imageHeight={front.height}
+              markers={analysis.markers}
+              active={active}
+              onSelectArea={setActive}
+            />
+          </div>
+          <div className="md:flex-1">
+            <AssessmentResult
+              assessment={analysis.assessment}
+              numberByArea={analysis.numberByArea}
+              active={active}
+              onSetActive={setActive}
+              onBook={() => setStep("book")}
+            />
+          </div>
+        </div>
       )}
 
       {step === "book" && analysis && (

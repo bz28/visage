@@ -130,10 +130,10 @@ export function Intake({ onSubmit }: Props) {
         />
       </Field>
 
-      <div className="flex flex-col gap-2">
+      <div className="sticky bottom-0 flex flex-col gap-2 bg-background/95 pb-3 pt-3 backdrop-blur">
         <button
           onClick={submit}
-          className="rounded-full bg-foreground px-7 py-3 font-medium text-background"
+          className="rounded-full bg-foreground px-7 py-3 font-medium text-background shadow-lg"
         >
           Continue
         </button>
