@@ -30,6 +30,9 @@ export function PhotoCapture({
   const mountedRef = useRef(true);
 
   useEffect(() => {
+    // Reset on (re)mount — Strict Mode mounts twice, and the first cleanup
+    // would otherwise leave this false and bail out of startCamera.
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       streamRef.current?.getTracks().forEach((t) => t.stop());
