@@ -3,7 +3,7 @@ import { CLINIC } from "@/lib/clinic";
 
 export default function Home() {
   return (
-    <main className="mx-auto flex min-h-full max-w-2xl flex-col gap-10 px-5 py-12 sm:py-20">
+    <main className="mx-auto flex min-h-full max-w-4xl flex-col gap-10 px-5 py-12 sm:py-20">
       <header className="text-center">
         <p className="text-sm font-medium uppercase tracking-widest text-[var(--accent)]">
           {CLINIC.name}

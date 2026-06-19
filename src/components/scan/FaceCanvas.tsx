@@ -135,7 +135,13 @@ export function FaceCanvas({
     draw();
     const ro = new ResizeObserver(() => draw());
     ro.observe(wrap);
-    return () => ro.disconnect();
+    // ResizeObserver only watches width; also redraw on viewport-height changes
+    // (mobile URL bar show/hide) so the height cap stays current.
+    window.addEventListener("resize", draw);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", draw);
+    };
   }, [markers, active, loaded, imageWidth, imageHeight]);
 
   return (

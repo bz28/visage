@@ -128,7 +128,11 @@ export function ScanFlow() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
+    <div
+      className={`mx-auto flex w-full flex-col gap-6 ${
+        step === "result" ? "max-w-3xl" : "max-w-lg"
+      }`}
+    >
       {step === "intake" && (
         <Intake
           onSubmit={(i) => {

@@ -94,7 +94,10 @@ export function PhotoCapture({
             className="w-full -scale-x-100 rounded-2xl bg-black"
           />
           {/* Pose cue overlay */}
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 flex items-center justify-center"
+          >
             {view === "front" ? (
               // Front: an oval to fit the face in.
               <div
