@@ -10,10 +10,10 @@ interface Props {
 // The AI read takes a real moment. Rather than a bare spinner, walk the patient
 // through what's happening — it reframes the wait as care, not lag.
 const STATUSES = [
-  "Mapping your facial proportions…",
-  "Comparing against balanced ratios…",
-  "Reading soft-tissue and contour…",
-  "Noting what an injector would discuss…",
+  "Mapping your features…",
+  "Looking at how everything balances…",
+  "Noticing the softer details…",
+  "Noting what we'd want to talk through…",
   "Writing up your read…",
 ] as const;
 
@@ -40,8 +40,12 @@ export function Analyzing({ dataUrl }: Props) {
         {/* Sweeping scan line over a soft scrim. */}
         <div className="absolute inset-0 bg-black/15" />
         <div className="scan-sweep absolute inset-x-0 h-1/3 bg-gradient-to-b from-transparent via-white/25 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 flex items-center gap-2.5 bg-gradient-to-t from-black/55 to-transparent px-5 pb-5 pt-10">
-          <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-white/70 border-t-transparent" />
+        <div
+          role="status"
+          aria-live="polite"
+          className="absolute inset-x-0 bottom-0 flex items-center gap-2.5 bg-gradient-to-t from-black/55 to-transparent px-5 pb-5 pt-10"
+        >
+          <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-white/70 border-t-transparent motion-reduce:animate-none" />
           <p className="text-sm font-medium text-white drop-shadow">
             {STATUSES[i]}
           </p>

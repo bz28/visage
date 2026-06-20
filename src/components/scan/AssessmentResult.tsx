@@ -82,7 +82,7 @@ export function AssessmentResult({
                   {a.roughAmount && (
                     <p className="mt-2.5 text-sm leading-relaxed text-neutral-500">
                       <span className="font-medium text-neutral-600">
-                        Roughly:{" "}
+                        Very roughly:{" "}
                       </span>
                       {a.roughAmount}
                     </p>
@@ -101,13 +101,10 @@ export function AssessmentResult({
             </p>
           )}
         </>
-      ) : (
-        <p className="rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-4 py-3.5 text-sm leading-relaxed text-neutral-600">
-          Your features read beautifully balanced — there&apos;s nothing we&apos;d
-          push. If you&apos;re curious, a consultation is the best place to explore
-          subtle refinements.
-        </p>
-      )}
+      ) : null}
+
+      {/* Disclaimer sits ABOVE the (desktop-)sticky CTA so it can't slide under it. */}
+      <p className="text-xs leading-relaxed text-neutral-400">{DISCLAIMER}</p>
 
       <div className="z-10 flex flex-col gap-2.5 rounded-2xl border border-border bg-surface/95 p-3 shadow-lg backdrop-blur md:sticky md:bottom-4">
         <button
@@ -135,8 +132,6 @@ export function AssessmentResult({
           visit.
         </p>
       </div>
-
-      <p className="text-xs leading-relaxed text-neutral-400">{DISCLAIMER}</p>
     </div>
   );
 }
