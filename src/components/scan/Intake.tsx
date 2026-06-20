@@ -103,7 +103,7 @@ export function Intake({ onSubmit }: Props) {
         </div>
       </Field>
 
-      <Field label="What are you after?">
+      <Field label="Where are you in your thinking?">
         <div className="flex flex-wrap gap-2">
           {BUDGET_OPTIONS.map((b) => (
             <Chip key={b} active={budget === b} onClick={() => setBudget(budget === b ? undefined : b)}>

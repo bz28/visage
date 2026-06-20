@@ -80,7 +80,7 @@ export function ScanFlow() {
 
       const result = await detectFace(img, w, h);
       if (result.status === "no-face") {
-        setError("We couldn't find a face in the front photo. Try better light, straight on.");
+        setError("We couldn't quite find a face in that photo. A bit more light, facing straight on, usually does it.");
         setStep("capture");
         return;
       }

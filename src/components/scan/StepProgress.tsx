@@ -14,20 +14,23 @@ export function StepProgress({ current }: Props) {
         const state =
           i < current ? "done" : i === current ? "current" : "upcoming";
         return (
-          <li key={label} className="flex flex-1 flex-col items-center gap-1.5">
-            <div className="flex w-full items-center">
-              <span
-                aria-current={state === "current" ? "step" : undefined}
-                className={`h-1 w-full rounded-full transition-colors ${
-                  state === "upcoming"
-                    ? "bg-border"
-                    : "bg-[var(--accent)]"
-                }`}
-              />
-            </div>
+          <li
+            key={label}
+            aria-current={state === "current" ? "step" : undefined}
+            className="flex flex-1 flex-col items-center gap-1.5"
+          >
             <span
-              className={`text-[11px] font-medium tracking-wide transition-colors ${
-                state === "upcoming" ? "text-neutral-400" : "text-[var(--accent)]"
+              className={`h-1 w-full rounded-full transition-colors ${
+                state === "upcoming" ? "bg-border" : "bg-[var(--accent)]"
+              } ${state === "current" ? "" : "opacity-70"}`}
+            />
+            <span
+              className={`text-[11px] tracking-wide transition-colors ${
+                state === "current"
+                  ? "font-semibold text-foreground"
+                  : state === "done"
+                    ? "font-medium text-[var(--accent)]"
+                    : "font-medium text-neutral-400"
               }`}
             >
               {label}

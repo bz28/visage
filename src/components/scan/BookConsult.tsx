@@ -89,7 +89,7 @@ export function BookConsult({ interests, onDone }: Props) {
       {interests.length > 0 && (
         <div className="rounded-2xl bg-[var(--accent)]/5 px-4 py-3">
           <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">
-            We&apos;ll have ready to discuss
+            Ready to talk through at your visit
           </p>
           <p className="mt-1 text-sm text-neutral-700">
             {interests

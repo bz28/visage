@@ -18,7 +18,7 @@ export const AREA_LABELS: Record<(typeof AREA_KEYS)[number], string> = {
   lips: "Lips",
   chin: "Chin",
   jawline: "Jawline",
-  cheeks: "Cheeks (midface)",
+  cheeks: "Cheeks",
   undereye: "Under-eye",
   temples: "Temples",
 };

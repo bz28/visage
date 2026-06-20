@@ -25,7 +25,7 @@ export function baselineAssessment(
       title: "Lip proportion",
       observation:
         "Your upper and lower lip are close in height, which can read a little thin in balance.",
-      why: "We'd often suggest a subtle lip enhancement to bring the lower lip toward the natural ~1.6:1 ratio — full, never overdone.",
+      why: "Lips are a common thing to talk through here — a little more in the lower lip can balance the two, the kind of full that still looks like you. Best explored in person.",
       confidence: "medium",
       priority: 2,
     });
@@ -47,7 +47,7 @@ export function baselineAssessment(
       title: "Chin & lower third",
       observation:
         "Your lower third sits a touch shorter than the upper and middle thirds.",
-      why: "We often use chin filler to lengthen and balance the lower third and sharpen the profile — though projection is best judged from the side, in person.",
+      why: "The chin is a common area people explore to balance a shorter lower third and refine the profile — though projection is really best judged from the side, in person.",
       confidence: "low",
       priority: 1,
     });
@@ -60,7 +60,7 @@ export function baselineAssessment(
       title: "Jawline definition",
       observation:
         "Your jaw width is narrower relative to your cheekbones than the typical balanced range.",
-      why: "We'd look at jawline filler to add definition and a cleaner angle — a popular, structure-led treatment for a stronger profile.",
+      why: "The jawline is a popular area to discuss for added definition and a cleaner angle — a structure-led look that's worth exploring together.",
       confidence: "low",
       priority: 2,
     });
