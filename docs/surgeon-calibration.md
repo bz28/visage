@@ -5,11 +5,39 @@ Purpose: questions for a practicing injector/plastic surgeon whose answers we
 clinically-grounded simulation — the part that differentiates us from "an LLM
 that makes lips bigger."
 
-Each question lists **why we need it** and **what we'd change** with the answer.
-The three places an answer can land:
+## Why we need this (and why an LLM alone isn't enough)
+
+The AI image model knows what "fuller lips" *looks like* in the abstract. It does
+**not** know the three things that make a preview clinically true instead of just
+plausible:
+
+1. **How much** a real treatment actually changes a face. "1 mL in the lips"
+   produces a *specific, measurable* change a real injector has seen thousands of
+   times. The model guesses — and it guesses toward *attractive*, not *accurate*
+   (in testing it smoothed skin and over-flattered). That gap is the medical-
+   liability risk: showing someone a better result than filler actually delivers.
+2. **Where and which direction** the volume goes — lower lip vs. border, chin
+   projection (a profile read) vs. width. The model approximates; a surgeon knows.
+3. **Where "overdone" begins** — the line the simulation must stop before.
+
+So the mental model: **the AI is the _renderer_; the surgeon data is the _ground
+truth_ that makes the render clinically real.** This is also the moat — anyone can
+prompt "fuller lips," but a simulation calibrated to *what real filler actually
+does*, tuned by a real injector, is hard to copy and is what makes a clinician
+trust it enough to put in front of patients. In this domain, being **accurate
+beats being impressive**.
+
+Where the input matters most: the **amounts and realism** (the simulation) need
+it the most; the **educational read** (which areas, the copy) needs it least —
+an LLM is broadly good enough there, and these questions just sharpen it.
+
+---
+
+Each question below lists **why we need it** and **what we'd change** with the
+answer. The three places an answer can land:
 - **Warp** = the deterministic geometry layer (phase 2) — how far/which way tissue moves; lives in warp code + documented mL constants.
 - **Read** = the AI assessment — `src/lib/ai.ts` (system prompt), `src/lib/baseline.ts` (rules), `src/lib/measurements.ts` (targets), `src/lib/assessment-schema.ts` (area list).
-- **Prompt** = the image-gen prompts/strengths per area & look in the new `/api/simulate` (what we're building now).
+- **Prompt** = the Gemini image-edit instruction per area & look in `/api/simulate` (the before/after we ship now — the amount/degree wording).
 
 Confidence: 🔴 we're guessing · 🟡 textbook default, want confirmation · 🟢 sanity-check only.
 
@@ -22,7 +50,7 @@ Confidence: 🔴 we're guessing · 🟡 textbook default, want confirmation · �
 
 ### Lips (first wedge)
 **1. 🔴 What do subtle / natural / fuller mean in mL?** (placeholder ~0.5 / ~1 / ~1.5–2)
-→ *Why:* defines our 3 presets. *Change:* sets the strength of each **Prompt** now, and the **Warp** magnitude per preset later.
+→ *Why:* defines our 3 presets. *Change:* sets the amount/degree wording of each **Prompt** now, and the **Warp** magnitude per preset later.
 
 **2. 🔴 When you add ~1 mL, where does the shape change most** (lower body, upper body, border, cupid's bow, corners), and the upper-vs-lower split?
 → *Why:* a lip isn't one blob. *Change:* tells the **Warp** which landmark points to move and how to weight them (e.g. more displacement on lower-lip points); also sharpens the **Prompt** ("fuller lower lip").
