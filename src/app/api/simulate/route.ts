@@ -1,30 +1,25 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  SIMULATABLE,
-  LOOK_KEYS,
-  LOOKS,
-  buildPrompt,
-} from "@/lib/simulation";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { generateText } from "ai";
+import { SIMULATABLE, LOOK_KEYS, LOOKS, buildPrompt } from "@/lib/simulation";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const bodySchema = z.object({
-  /** Source photo + mask, both as data URLs. */
+  /** Source photo as a data URL. */
   image: z.string().min(1),
-  mask: z.string().min(1),
   area: z.enum(SIMULATABLE),
   look: z.enum(LOOK_KEYS),
 });
 
-// fal.ai inpainting model. SDXL inpaint renders in ~6s (FLUX inpaint was ~85s —
-// far too slow for an interactive preview) with strong, identity-stable results
-// for a small masked region. Verified end-to-end with a real key.
-const FAL_MODEL = "fal-ai/fast-sdxl/inpainting";
-const NEGATIVE_PROMPT =
-  "overfilled, overdone, duck lips, fake, distorted, asymmetrical, " +
-  "different person, blurry, deformed, plastic, cartoonish";
+// Gemini 2.5 Flash Image ("Nano Banana") — instruction-based image editing with
+// strong identity preservation. Unlike masked SDXL inpaint, region control comes
+// from the prompt ("change only the lips"), and it doesn't black out faces.
+const MODEL = "gemini-2.5-flash-image";
+const API_KEY =
+  process.env.GEMINI_API_KEY ?? process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
 export async function POST(req: Request) {
   let body;
@@ -40,7 +35,7 @@ export async function POST(req: Request) {
   // Dev mock (no key): echo the original photo so the UI flow is fully testable
   // without paying for / configuring image-gen. Never in production.
   if (
-    !process.env.FAL_KEY &&
+    !API_KEY &&
     process.env.MOCK_SIMULATE &&
     process.env.NODE_ENV !== "production"
   ) {
@@ -49,55 +44,39 @@ export async function POST(req: Request) {
   }
 
   // No key configured: tell the client to fall back to the markers-only read.
-  if (!process.env.FAL_KEY) {
+  if (!API_KEY) {
     return NextResponse.json({ fallback: true });
   }
 
   try {
-    const res = await fetch(`https://fal.run/${FAL_MODEL}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Key ${process.env.FAL_KEY}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        image_url: body.image,
-        mask_url: body.mask,
-        prompt,
-        negative_prompt: NEGATIVE_PROMPT,
-        strength: look.strength,
-        num_inference_steps: 30,
-        // The NSFW checker false-positives on aesthetic face photos and returns
-        // a BLACKED-OUT image. We author the prompt (users can't inject one) and
-        // only repaint a small region of the user's own consented face, so the
-        // content it guards against can't arise here. Keep it off.
-        enable_safety_checker: false,
-      }),
+    const google = createGoogleGenerativeAI({ apiKey: API_KEY });
+    const result = await generateText({
+      model: google(MODEL),
+      providerOptions: { google: { responseModalities: ["IMAGE"] } },
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { type: "image", image: body.image },
+          ],
+        },
+      ],
     });
-    if (!res.ok) throw new Error(`fal ${res.status}`);
-    const data = await res.json();
-    const url: string | undefined =
-      data?.images?.[0]?.url ?? data?.image?.url;
-    if (!url) throw new Error("no image in response");
 
-    // Return the result as a data URL rather than handing the client a public
-    // URL to a modified face photo (privacy).
-    const img = await fetch(url);
-    const buf = Buffer.from(await img.arrayBuffer());
-
-    // Insurance: a blacked-out / blank result is tiny (a few KB) vs ~300KB for a
-    // real render. If we ever get one, fail to the graceful fallback rather than
-    // show the patient a black box.
-    if (buf.byteLength < 20_000) {
-      throw new Error(`suspiciously small image (${buf.byteLength}b)`);
+    const image = result.files.find((f) => f.mediaType.startsWith("image/"));
+    // No image back usually means a safety refusal — fall back gracefully
+    // (never surface a blank/black box to the patient).
+    if (!image) {
+      return NextResponse.json({ fallback: true });
     }
 
-    const mime = img.headers.get("content-type") ?? "image/png";
+    // Return as a data URL rather than a public URL to a modified face (privacy).
     return NextResponse.json({
-      image: `data:${mime};base64,${buf.toString("base64")}`,
+      image: `data:${image.mediaType};base64,${image.base64}`,
     });
   } catch (err) {
-    // Log only the message — never the image/mask payloads.
+    // Log only the message — never the image payload.
     console.error(
       "[simulate] failed, falling back:",
       err instanceof Error ? err.message : String(err),

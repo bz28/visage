@@ -5,7 +5,6 @@ import { detectFace, type Pt } from "@/lib/landmarks";
 import { computeMeasurements } from "@/lib/measurements";
 import { baselineAssessment } from "@/lib/baseline";
 import { buildAnnotations, type Marker } from "@/lib/annotations";
-import { buildAreaMask } from "@/lib/mask";
 import type { LookKey, SimulatableArea } from "@/lib/simulation";
 import type { Assessment } from "@/lib/assessment-schema";
 import type { Intake as IntakeData } from "@/lib/intake-schema";
@@ -70,6 +69,9 @@ export function ScanFlow() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
   const previewCache = useRef<Record<string, string>>({});
+  // The look last shown for each area, so navigating back to an area restores
+  // its preview instead of dropping to the bare photo.
+  const lastLookByArea = useRef<Partial<Record<SimulatableArea, LookKey>>>({});
   // Drops stale responses when the user switches area / look mid-generation.
   const previewReqId = useRef(0);
 
@@ -79,6 +81,7 @@ export function ScanFlow() {
     const key = `${area}:${look}`;
     const cached = previewCache.current[key];
     if (cached) {
+      lastLookByArea.current[area] = look;
       setPreviewFailed(false);
       setPreview({ area, look, src: cached });
       return;
@@ -86,17 +89,18 @@ export function ScanFlow() {
     setPreviewFailed(false);
     setPreviewLoading(true);
     try {
-      const mask = buildAreaMask(landmarks, area, front.width, front.height);
       const res = await fetch("/api/simulate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ image: front.dataUrl, mask, area, look }),
+        body: JSON.stringify({ image: front.dataUrl, area, look }),
       });
       const data: { image?: string; fallback?: boolean } = await res.json();
       if (data.image) previewCache.current[key] = data.image; // cache regardless
       if (reqId !== previewReqId.current) return; // superseded — ignore
-      if (data.image) setPreview({ area, look, src: data.image });
-      else setPreviewFailed(true);
+      if (data.image) {
+        lastLookByArea.current[area] = look;
+        setPreview({ area, look, src: data.image });
+      } else setPreviewFailed(true);
     } catch {
       if (reqId === previewReqId.current) setPreviewFailed(true);
     } finally {
@@ -104,14 +108,22 @@ export function ScanFlow() {
     }
   }
 
-  // Switching the active area drops back to the real photo for the new area.
+  // Switching the active area restores that area's last preview if we have one
+  // cached, so a generated look isn't lost when navigating away and back.
   function selectActive(area: string | null) {
     setActive(area);
-    if (area !== preview?.area) {
-      previewReqId.current++; // invalidate any in-flight generation
+    if (area === preview?.area) return;
+    previewReqId.current++; // invalidate any in-flight generation
+    setPreviewLoading(false);
+    setPreviewFailed(false);
+
+    const simArea = area as SimulatableArea | null;
+    const lastLook = simArea ? lastLookByArea.current[simArea] : undefined;
+    const cached = simArea && lastLook ? previewCache.current[`${simArea}:${lastLook}`] : undefined;
+    if (simArea && lastLook && cached) {
+      setPreview({ area: simArea, look: lastLook, src: cached });
+    } else {
       setPreview(null);
-      setPreviewFailed(false);
-      setPreviewLoading(false);
     }
   }
 
@@ -199,6 +211,7 @@ export function ScanFlow() {
     setPreview(null);
     setPreviewFailed(false);
     previewCache.current = {};
+    lastLookByArea.current = {};
     setStep("intake");
   }
 
