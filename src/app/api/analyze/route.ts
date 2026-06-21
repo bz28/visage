@@ -4,6 +4,7 @@ import { measurementsSchema } from "@/lib/measurements-schema";
 import { intakeSchema } from "@/lib/intake-schema";
 import { baselineAssessment } from "@/lib/baseline";
 import { analyzeFace } from "@/lib/ai";
+import { MOCK_ASSESSMENT } from "@/lib/mock-assessment";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -29,6 +30,13 @@ export async function POST(req: Request) {
     parsed = bodySchema.parse(await req.json());
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  // Dev-only escape hatch: skip the paid vision call and return canned data so
+  // UI work on the result/book screens is instant and free. Double-guarded so a
+  // leaked env var can never mock a real (production) read.
+  if (process.env.MOCK_ANALYZE && process.env.NODE_ENV !== "production") {
+    return NextResponse.json({ assessment: MOCK_ASSESSMENT, source: "mock" });
   }
 
   const baseline = baselineAssessment(parsed.measurements, parsed.intake);
