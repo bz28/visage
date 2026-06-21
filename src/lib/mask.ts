@@ -69,6 +69,19 @@ export function buildAreaMask(
       }
       break;
     }
+    case "jawline": {
+      // The jaw is an open contour (gonion → menton → gonion), not a region —
+      // stroke it as a thick band along the edge, where filler defines the angle.
+      const pts = REGIONS.jawline.map((i) => lm[i]).filter(Boolean);
+      if (pts.length >= 3) {
+        ctx.lineWidth = dilate * 3.5;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+        ctx.stroke();
+      }
+      break;
+    }
   }
 
   ctx.filter = "none";

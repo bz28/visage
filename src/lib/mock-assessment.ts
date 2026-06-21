@@ -34,12 +34,12 @@ export const MOCK_ASSESSMENT: Assessment = {
       priority: 2,
     },
     {
-      area: "cheeks",
-      title: "Cheek contour",
+      area: "jawline",
+      title: "Jawline definition",
       observation:
-        "There's a gentle flattening through the upper cheek that softens your natural contour.",
-      why: "A subtle lift here can restore a little structure and light to the midface — the kind of refresh that reads as 'well-rested,' not 'done.'",
-      confidence: "medium",
+        "The jaw has good width and balance, but the angle reads a little soft rather than sharply defined.",
+      why: "Adding subtle structure along the jaw angle is a common way people explore a cleaner, more defined silhouette — best confirmed in profile, in person.",
+      confidence: "low",
       priority: 3,
     },
   ],
