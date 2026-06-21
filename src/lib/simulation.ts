@@ -50,9 +50,12 @@ export function buildPrompt(
   const degree = LOOKS.find((l) => l.label === label)?.degree ?? "naturally";
   return (
     `Edit this photo: ${AREA_EDIT[area]}, ${degree} (about ${ml} ml of filler — ` +
-    `a ${label.toLowerCase()} amount). Change ONLY the ${area}. Keep the person's ` +
-    `identity, face shape, skin tone and texture, lighting, pose, hair, and ` +
-    `background EXACTLY the same. The result must be photorealistic, natural, and ` +
-    `tasteful — never overfilled or "overdone". Output only the edited photo.`
+    `a ${label.toLowerCase()} amount). Change ONLY the ${area} — nothing else. ` +
+    `This is a medical preview, so accuracy matters more than flattery: do NOT ` +
+    `smooth, retouch, beautify, or slim the face; preserve every detail of the ` +
+    `original — exact skin texture, pores, freckles, blemishes, expression, smile, ` +
+    `teeth, identity, face shape, lighting, sharpness, pose, hair, and background. ` +
+    `Keep the same camera framing and resolution. The result must be photorealistic ` +
+    `and tasteful — never overfilled or "overdone". Output only the edited photo.`
   );
 }
