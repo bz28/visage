@@ -5,6 +5,7 @@ import { detectFace, type Pt } from "@/lib/landmarks";
 import { computeMeasurements } from "@/lib/measurements";
 import { baselineAssessment } from "@/lib/baseline";
 import { buildAnnotations, type Marker } from "@/lib/annotations";
+import { compositeArea, isMouthOpen } from "@/lib/composite";
 import type { LookKey, SimulatableArea } from "@/lib/simulation";
 import type { Assessment } from "@/lib/assessment-schema";
 import type { Intake as IntakeData } from "@/lib/intake-schema";
@@ -90,17 +91,40 @@ export function ScanFlow() {
     setPreviewFailed(false);
     setPreviewLoading(true);
     try {
-      const res = await fetch("/api/simulate", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ image: front.dataUrl, area, look }),
-      });
-      const data: { image?: string; fallback?: boolean } = await res.json();
-      if (data.image) previewCache.current[key] = data.image; // cache regardless
-      if (reqId !== previewReqId.current) return; // superseded — ignore
-      if (data.image) {
+      // Generate, then composite the treated region back onto the original so
+      // everything else is locked. If the harness rejects it (e.g. the mouth
+      // drifted), retry with a fresh generation — Gemini is stochastic.
+      // Tell the model the actual mouth state so it pins it (closed stays
+      // closed) — fewer harness rejections, more faithful output.
+      const mouthOpen = isMouthOpen(landmarks);
+      let composited: string | null = null;
+      for (let attempt = 0; attempt < 3 && !composited; attempt++) {
+        const res = await fetch("/api/simulate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ image: front.dataUrl, area, look, mouthOpen }),
+        });
+        if (reqId !== previewReqId.current) return; // superseded mid-flight
+        const data: { image?: string; fallback?: boolean } = await res.json();
+        if (!data.image) break; // server fell back (no key / refusal / error)
+
+        const result = await compositeArea(
+          front.dataUrl,
+          landmarks,
+          area,
+          data.image,
+          front.width,
+          front.height,
+        );
+        if (reqId !== previewReqId.current) return;
+        if (result.ok && result.dataUrl) composited = result.dataUrl;
+        else console.warn(`[preview] rejected, retrying: ${result.reason}`);
+      }
+
+      if (composited) {
+        previewCache.current[key] = composited;
         lastLookByArea.current[area] = look;
-        setPreview({ area, look, src: data.image });
+        setPreview({ area, look, src: composited });
       } else setPreviewFailed(true);
     } catch {
       if (reqId === previewReqId.current) setPreviewFailed(true);
