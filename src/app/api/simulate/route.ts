@@ -12,6 +12,8 @@ const bodySchema = z.object({
   image: z.string().min(1),
   area: z.enum(SIMULATABLE),
   look: z.enum(LOOK_KEYS),
+  /** Observed mouth state from the client's landmarks — pins it in the prompt. */
+  mouthOpen: z.boolean().optional(),
 });
 
 // Gemini 2.5 Flash Image ("Nano Banana") — instruction-based image editing with
@@ -30,7 +32,7 @@ export async function POST(req: Request) {
   }
 
   const look = LOOKS.find((l) => l.key === body.look)!;
-  const prompt = buildPrompt(body.area, look.ml, look.label);
+  const prompt = buildPrompt(body.area, look.ml, look.label, body.mouthOpen);
 
   // Dev mock (no key): echo the original photo so the UI flow is fully testable
   // without paying for / configuring image-gen. Never in production.

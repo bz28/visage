@@ -124,12 +124,9 @@ export function AssessmentResult({
                     </span>
                   </div>
 
-                  {previewFailed ? (
-                    <p className="text-sm text-neutral-500">
-                      Preview isn&apos;t available right now — your read still
-                      stands.
-                    </p>
-                  ) : previewArea === active ? (
+                  {previewArea === active ? (
+                    /* We already have a working preview for this area — keep the
+                       selector up; a failed look just shows a gentle hint. */
                     <>
                       <div className="flex gap-2">
                         {LOOKS.map((l) => {
@@ -153,8 +150,24 @@ export function AssessmentResult({
                       <p className="text-xs text-neutral-400">
                         {previewLoading
                           ? "Rendering your preview…"
-                          : "Press and hold the photo to compare to before."}
+                          : previewFailed
+                            ? "That look didn't come through — try another."
+                            : "Press and hold the photo to compare to before."}
                       </p>
+                    </>
+                  ) : previewFailed ? (
+                    <>
+                      <p className="text-sm text-neutral-500">
+                        Preview isn&apos;t available right now — your read still
+                        stands.
+                      </p>
+                      <button
+                        disabled={previewLoading}
+                        onClick={() => onPreview(active, DEFAULT_LOOK)}
+                        className="self-start rounded-full border border-neutral-300 px-4 py-1.5 text-sm font-medium transition-colors hover:border-neutral-400 disabled:opacity-50"
+                      >
+                        {previewLoading ? "Rendering…" : "Try again"}
+                      </button>
                     </>
                   ) : (
                     <>

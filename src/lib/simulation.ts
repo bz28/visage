@@ -46,16 +46,30 @@ export function buildPrompt(
   area: SimulatableArea,
   ml: number,
   label: string,
+  mouthOpen?: boolean,
 ): string {
   const degree = LOOKS.find((l) => l.label === label)?.degree ?? "naturally";
+  // Assert the actual observed mouth state — far stronger guidance than a
+  // generic "keep it closed", and it matches what the harness will verify.
+  let mouthRule = "";
+  if (area === "lips" && mouthOpen !== undefined) {
+    mouthRule = mouthOpen
+      ? `CRITICAL: in this photo the mouth is OPEN and the teeth are showing — ` +
+        `keep the exact same smile, mouth opening, and teeth; do not close the ` +
+        `mouth or change the expression. `
+      : `CRITICAL: in this photo the mouth is CLOSED with the lips together and ` +
+        `NO teeth showing — keep it exactly closed; do NOT open the mouth, add a ` +
+        `smile, or show any teeth. `;
+  }
   return (
     `Edit this photo: ${AREA_EDIT[area]}, ${degree} (about ${ml} ml of filler — ` +
     `a ${label.toLowerCase()} amount). Change ONLY the ${area} — nothing else. ` +
-    `This is a medical preview, so accuracy matters more than flattery: do NOT ` +
-    `smooth, retouch, beautify, or slim the face; preserve every detail of the ` +
-    `original — exact skin texture, pores, freckles, blemishes, expression, smile, ` +
-    `teeth, identity, face shape, lighting, sharpness, pose, hair, and background. ` +
-    `Keep the same camera framing and resolution. The result must be photorealistic ` +
-    `and tasteful — never overfilled or "overdone". Output only the edited photo.`
+    `${mouthRule}This is a medical preview, so accuracy matters more than ` +
+    `flattery: do NOT smooth, retouch, beautify, or slim the face; preserve every ` +
+    `detail of the original — exact skin texture, pores, freckles, blemishes, ` +
+    `expression, teeth, identity, face shape, lighting, sharpness, pose, hair, and ` +
+    `background. Keep the same camera framing and resolution. The result must be ` +
+    `photorealistic and tasteful — never overfilled or "overdone". Output only the ` +
+    `edited photo.`
   );
 }
