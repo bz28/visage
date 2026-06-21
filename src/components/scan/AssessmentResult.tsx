@@ -57,8 +57,9 @@ export function AssessmentResult({
       {uniqueAreas.length > 0 ? (
         <>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-400">
-            {uniqueAreas.length} area{uniqueAreas.length > 1 ? "s" : ""} we&apos;d
-            talk through
+            {`${uniqueAreas.length} ${
+              uniqueAreas.length > 1 ? "areas" : "area"
+            } we'd talk through`}
           </p>
 
           {/* Numbered chips — tap to expand (mirrors the dots on the photo). */}
