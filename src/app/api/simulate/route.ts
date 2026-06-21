@@ -18,9 +18,13 @@ const bodySchema = z.object({
   look: z.enum(LOOK_KEYS),
 });
 
-// fal.ai inpainting model. The exact model + params are confirmed/tuned on the
-// first real run with a key (which is also our realism-calibration pass).
-const FAL_MODEL = "fal-ai/flux-general/inpainting";
+// fal.ai inpainting model. SDXL inpaint renders in ~6s (FLUX inpaint was ~85s —
+// far too slow for an interactive preview) with strong, identity-stable results
+// for a small masked region. Verified end-to-end with a real key.
+const FAL_MODEL = "fal-ai/fast-sdxl/inpainting";
+const NEGATIVE_PROMPT =
+  "overfilled, overdone, duck lips, fake, distorted, asymmetrical, " +
+  "different person, blurry, deformed, plastic, cartoonish";
 
 export async function POST(req: Request) {
   let body;
@@ -60,8 +64,9 @@ export async function POST(req: Request) {
         image_url: body.image,
         mask_url: body.mask,
         prompt,
+        negative_prompt: NEGATIVE_PROMPT,
         strength: look.strength,
-        num_inference_steps: 28,
+        num_inference_steps: 30,
       }),
     });
     if (!res.ok) throw new Error(`fal ${res.status}`);
