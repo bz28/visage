@@ -174,6 +174,13 @@ export function AssessmentResult({
                   )}
                 </div>
               )}
+
+              {active && !isSimulatable(active) && (
+                <p className="rounded-xl border border-dashed border-neutral-300 bg-surface px-4 py-3 text-xs leading-relaxed text-neutral-500">
+                  This area is a delicate one we read best in person — we&apos;d
+                  rather walk you through it together than show a rough preview.
+                </p>
+              )}
             </div>
           ) : (
             <p className="rounded-2xl border border-dashed border-neutral-300 px-4 py-3.5 text-sm text-neutral-400">

@@ -274,6 +274,7 @@ export function ScanFlow() {
                   active={active}
                   onSelectArea={selectActive}
                   previewSrc={preview?.src ?? null}
+                  previewLoading={previewLoading}
                 />
               </div>
               <div className="md:flex-1">
