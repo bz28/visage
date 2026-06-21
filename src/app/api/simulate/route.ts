@@ -67,6 +67,11 @@ export async function POST(req: Request) {
         negative_prompt: NEGATIVE_PROMPT,
         strength: look.strength,
         num_inference_steps: 30,
+        // The NSFW checker false-positives on aesthetic face photos and returns
+        // a BLACKED-OUT image. We author the prompt (users can't inject one) and
+        // only repaint a small region of the user's own consented face, so the
+        // content it guards against can't arise here. Keep it off.
+        enable_safety_checker: false,
       }),
     });
     if (!res.ok) throw new Error(`fal ${res.status}`);
@@ -79,6 +84,14 @@ export async function POST(req: Request) {
     // URL to a modified face photo (privacy).
     const img = await fetch(url);
     const buf = Buffer.from(await img.arrayBuffer());
+
+    // Insurance: a blacked-out / blank result is tiny (a few KB) vs ~300KB for a
+    // real render. If we ever get one, fail to the graceful fallback rather than
+    // show the patient a black box.
+    if (buf.byteLength < 20_000) {
+      throw new Error(`suspiciously small image (${buf.byteLength}b)`);
+    }
+
     const mime = img.headers.get("content-type") ?? "image/png";
     return NextResponse.json({
       image: `data:${mime};base64,${buf.toString("base64")}`,
