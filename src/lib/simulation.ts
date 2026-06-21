@@ -18,11 +18,12 @@ export const LOOKS: { key: LookKey; label: string; ml: number; strength: number 
 export const DEFAULT_LOOK: LookKey = "natural";
 
 /**
- * Areas we can preview from a single FRONT photo. Lips read best; chin and
- * cheeks are best-effort here (chin projection really wants a profile) — see the
- * calibration doc. Other flagged areas get the read only, no preview.
+ * Areas we can preview from a single FRONT photo. Lips read best; chin, jawline,
+ * and cheeks are best-effort here (chin/jaw projection really wants a profile) —
+ * see the calibration doc. Other flagged areas (under-eye, temples) get the read
+ * only — no front-photo preview.
  */
-export const SIMULATABLE = ["lips", "chin", "cheeks"] as const;
+export const SIMULATABLE = ["lips", "chin", "jawline", "cheeks"] as const;
 export type SimulatableArea = (typeof SIMULATABLE)[number];
 
 export function isSimulatable(area: string): area is SimulatableArea {
@@ -32,6 +33,7 @@ export function isSimulatable(area: string): area is SimulatableArea {
 const AREA_PHRASE: Record<SimulatableArea, string> = {
   lips: "subtly fuller, naturally enhanced lips",
   chin: "a slightly more defined, balanced chin",
+  jawline: "a subtly sharper, more defined jawline angle",
   cheeks: "softly lifted, naturally fuller cheeks",
 };
 

@@ -15,12 +15,15 @@ interface Props {
   onSelectArea?: (area: string | null) => void;
   /** AI-generated "after" image to overlay; press-and-hold reveals the before. */
   previewSrc?: string | null;
+  /** A preview is currently generating — show a gentle shimmer. */
+  previewLoading?: boolean;
 }
 
-// The user's own photo with numbered markers (the read). When a preview is
-// active it overlays the AI "after" of their own photo; press-and-hold drops
-// back to the real before. Sizes to its container with a height cap so it fits
-// a desktop column or a capped mobile block without forcing scroll.
+// The user's own photo with numbered markers (the read), drawn on a canvas.
+// The AI "after" is a separate DOM layer that crossfades over the canvas, so the
+// reveal and press-and-hold compare are smooth and the markers fade rather than
+// snap. Sizes to its container with a height cap so it fits a desktop column or
+// a capped mobile block without forcing scroll.
 export function FaceCanvas({
   dataUrl,
   imageWidth,
@@ -29,16 +32,22 @@ export function FaceCanvas({
   active,
   onSelectArea,
   previewSrc,
+  previewLoading,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
-  const previewRef = useRef<HTMLImageElement | null>(null);
   const [loaded, setLoaded] = useState(0);
-  const [previewLoaded, setPreviewLoaded] = useState(0);
+  // The src of the most recently decoded "after"; ready when it matches the
+  // current previewSrc (derived, so it clears automatically on source change).
+  const [readySrc, setReadySrc] = useState<string | null>(null);
   const [comparing, setComparing] = useState(false);
 
-  function handleClick(e: React.MouseEvent<HTMLCanvasElement>) {
+  const afterReady = !!previewSrc && readySrc === previewSrc;
+  // The "after" is shown when loaded and the user isn't holding to compare.
+  const showingAfter = afterReady && !comparing;
+
+  function handleClick(e: React.MouseEvent) {
     // While previewing, the photo is a hold-to-compare surface, not a picker.
     if (!onSelectArea || previewSrc) return;
     const canvas = canvasRef.current;
@@ -72,25 +81,8 @@ export function FaceCanvas({
     };
   }, [dataUrl]);
 
-  // Load the preview image when it changes. (`comparing` resets naturally on
-  // pointer-up; no need to reset it here.)
-  useEffect(() => {
-    if (!previewSrc) {
-      previewRef.current = null;
-      return;
-    }
-    const img = new Image();
-    img.onload = () => {
-      previewRef.current = img;
-      setPreviewLoaded((n) => n + 1);
-    };
-    img.src = previewSrc;
-    return () => {
-      previewRef.current = null;
-    };
-  }, [previewSrc]);
-
-  // Draw on load / marker change / resize.
+  // Draw the before photo + markers on the canvas (no preview here — that's the
+  // crossfading DOM layer below).
   useEffect(() => {
     const wrap = wrapRef.current;
     const canvas = canvasRef.current;
@@ -101,10 +93,6 @@ export function FaceCanvas({
       if (!wrap || !canvas || !img) return;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
-
-      // Show the AI "after" when we have one and aren't holding to compare.
-      const showingPreview = !!previewSrc && !!previewRef.current && !comparing;
-      const drawImg = showingPreview ? previewRef.current! : img;
 
       const availW = wrap.clientWidth || imageWidth;
       // Let the photo breathe on desktop (immersive read); stay capped on mobile
@@ -126,34 +114,12 @@ export function FaceCanvas({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       ctx.clearRect(0, 0, cssW, cssH);
-      ctx.drawImage(drawImg, 0, 0, cssW, cssH);
+      ctx.drawImage(img, 0, 0, cssW, cssH);
 
       const accent =
         getComputedStyle(document.documentElement)
           .getPropertyValue("--accent")
           .trim() || "#b8895f";
-
-      // A small badge so it's unmistakable which image they're looking at.
-      function badge(text: string, bg: string) {
-        ctx!.font = "600 12px ui-sans-serif, system-ui, sans-serif";
-        ctx!.textAlign = "left";
-        ctx!.textBaseline = "middle";
-        const padX = 10;
-        const h = 24;
-        const w = ctx!.measureText(text).width + padX * 2;
-        ctx!.fillStyle = bg;
-        ctx!.beginPath();
-        ctx!.roundRect(10, 10, w, h, h / 2);
-        ctx!.fill();
-        ctx!.fillStyle = "#fff";
-        ctx!.fillText(text, 10 + padX, 10 + h / 2 + 0.5);
-      }
-      if (previewSrc && previewRef.current) {
-        badge(comparing ? "Before" : "Simulated preview", "rgba(15,15,15,0.78)");
-      }
-
-      // Markers only on the "before"/read view — they'd clutter the preview.
-      if (showingPreview) return;
 
       for (const m of markers) {
         const x = m.point.x * scale;
@@ -200,16 +166,7 @@ export function FaceCanvas({
       ro.disconnect();
       window.removeEventListener("resize", draw);
     };
-  }, [
-    markers,
-    active,
-    loaded,
-    imageWidth,
-    imageHeight,
-    previewSrc,
-    previewLoaded,
-    comparing,
-  ]);
+  }, [markers, active, loaded, imageWidth, imageHeight]);
 
   const compareProps = previewSrc
     ? {
@@ -222,19 +179,52 @@ export function FaceCanvas({
 
   return (
     <div ref={wrapRef} className="flex justify-center">
-      <canvas
-        ref={canvasRef}
-        onClick={handleClick}
+      <div
+        className="relative select-none"
         {...compareProps}
-        className={`touch-none select-none rounded-2xl shadow-sm ${
-          previewSrc ? "cursor-pointer" : onSelectArea ? "cursor-pointer" : ""
-        }`}
         aria-label={
           previewSrc
             ? "Simulated preview of your photo — press and hold to compare to before"
             : "Your photo with the areas an injector might discuss marked"
         }
-      />
+      >
+        <canvas
+          ref={canvasRef}
+          onClick={handleClick}
+          className={`block touch-none rounded-2xl shadow-sm ${
+            onSelectArea && !previewSrc ? "cursor-pointer" : ""
+          } ${previewSrc ? "cursor-pointer" : ""}`}
+        />
+
+        {/* AI "after" — crossfades over the canvas so the reveal and the
+            hold-to-compare are smooth, and the markers fade rather than snap. */}
+        {previewSrc && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={previewSrc}
+            alt=""
+            onLoad={() => setReadySrc(previewSrc)}
+            draggable={false}
+            className="pointer-events-none absolute inset-0 size-full rounded-2xl object-cover transition-opacity duration-300 ease-out"
+            style={{ opacity: showingAfter ? 1 : 0 }}
+          />
+        )}
+
+        {/* A small badge so it's unmistakable which image is on screen. */}
+        {previewSrc && afterReady && (
+          <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/75 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm transition-opacity duration-300">
+            {showingAfter ? "Simulated preview" : "Before"}
+          </div>
+        )}
+
+        {/* Gentle shimmer while a preview generates. */}
+        {previewLoading && (
+          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+            <div className="absolute inset-0 bg-black/10" />
+            <div className="scan-sweep absolute inset-x-0 h-1/3 bg-gradient-to-b from-transparent via-white/30 to-transparent" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
