@@ -3,19 +3,28 @@
 import { useState } from "react";
 import { CLINIC } from "@/lib/clinic";
 import { AREA_LABELS } from "@/lib/assessment-schema";
+import { LOOKS, type LookKey, type SimulatableArea } from "@/lib/simulation";
 
 interface Props {
   interests: string[];
+  /** The before/after look the patient settled on, carried into the lead. */
+  previewedLook?: { area: SimulatableArea; look: LookKey };
   onDone: () => void;
 }
 
-export function BookConsult({ interests, onDone }: Props) {
+export function BookConsult({ interests, previewedLook, onDone }: Props) {
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
   const [note, setNote] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "done" | "error">(
     "idle",
   );
+
+  const previewSummary = previewedLook
+    ? `${AREA_LABELS[previewedLook.area]} — ${
+        LOOKS.find((l) => l.key === previewedLook.look)?.label
+      }`
+    : null;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,7 +33,14 @@ export function BookConsult({ interests, onDone }: Props) {
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, contact, interests, note }),
+        body: JSON.stringify({
+          name,
+          contact,
+          interests,
+          note: previewSummary
+            ? `Previewed: ${previewSummary}.${note ? ` ${note}` : ""}`
+            : note,
+        }),
       });
       if (!res.ok) throw new Error();
       setStatus("done");
@@ -96,6 +112,11 @@ export function BookConsult({ interests, onDone }: Props) {
               .map((i) => AREA_LABELS[i as keyof typeof AREA_LABELS] ?? i)
               .join(" · ")}
           </p>
+          {previewSummary && (
+            <p className="mt-1.5 text-xs text-neutral-500">
+              You previewed: <span className="text-neutral-700">{previewSummary}</span>
+            </p>
+          )}
         </div>
       )}
 

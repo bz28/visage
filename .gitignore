@@ -44,3 +44,8 @@ next-env.d.ts
 .playwright-mcp/
 /desktop-*.png
 /v2-*.png
+
+# more browser-agent screenshots
+/sim-*.png
+/fix-*.png
+/mock-*.png
