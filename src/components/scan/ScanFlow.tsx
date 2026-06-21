@@ -70,9 +70,12 @@ export function ScanFlow() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
   const previewCache = useRef<Record<string, string>>({});
+  // Drops stale responses when the user switches area / look mid-generation.
+  const previewReqId = useRef(0);
 
   async function requestPreview(area: SimulatableArea, look: LookKey) {
     if (!landmarks || !front) return;
+    const reqId = ++previewReqId.current;
     const key = `${area}:${look}`;
     const cached = previewCache.current[key];
     if (cached) {
@@ -90,16 +93,14 @@ export function ScanFlow() {
         body: JSON.stringify({ image: front.dataUrl, mask, area, look }),
       });
       const data: { image?: string; fallback?: boolean } = await res.json();
-      if (data.image) {
-        previewCache.current[key] = data.image;
-        setPreview({ area, look, src: data.image });
-      } else {
-        setPreviewFailed(true);
-      }
+      if (data.image) previewCache.current[key] = data.image; // cache regardless
+      if (reqId !== previewReqId.current) return; // superseded — ignore
+      if (data.image) setPreview({ area, look, src: data.image });
+      else setPreviewFailed(true);
     } catch {
-      setPreviewFailed(true);
+      if (reqId === previewReqId.current) setPreviewFailed(true);
     } finally {
-      setPreviewLoading(false);
+      if (reqId === previewReqId.current) setPreviewLoading(false);
     }
   }
 
@@ -107,8 +108,10 @@ export function ScanFlow() {
   function selectActive(area: string | null) {
     setActive(area);
     if (area !== preview?.area) {
+      previewReqId.current++; // invalidate any in-flight generation
       setPreview(null);
       setPreviewFailed(false);
+      setPreviewLoading(false);
     }
   }
 
