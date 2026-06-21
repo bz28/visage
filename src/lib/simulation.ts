@@ -2,9 +2,9 @@
  * Looks the patient can preview, as approximate filler amounts.
  *
  * The mL figures are CLINICAL PLACEHOLDERS pending surgeon calibration — see
- * docs/surgeon-calibration.md. Today they only shape the prompt + the inpaint
- * denoise strength; the phase-2 deterministic warp will use real, calibrated
- * displacement values instead of guessing.
+ * docs/surgeon-calibration.md. Today they only shape the edit prompt's
+ * amount/degree wording; the phase-2 deterministic warp will use real,
+ * calibrated displacement values instead of guessing.
  */
 export const LOOK_KEYS = ["subtle", "natural", "fuller"] as const;
 export type LookKey = (typeof LOOK_KEYS)[number];

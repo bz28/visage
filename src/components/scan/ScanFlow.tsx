@@ -83,6 +83,7 @@ export function ScanFlow() {
     if (cached) {
       lastLookByArea.current[area] = look;
       setPreviewFailed(false);
+      setPreviewLoading(false);
       setPreview({ area, look, src: cached });
       return;
     }
