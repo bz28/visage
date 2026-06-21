@@ -121,6 +121,10 @@ export function FaceCanvas({
           .getPropertyValue("--accent")
           .trim() || "#b8895f";
 
+      // In preview mode the canvas is only seen during press-and-hold compare —
+      // keep it a clean "before", no markers covering the face.
+      if (previewSrc) return;
+
       for (const m of markers) {
         const x = m.point.x * scale;
         const y = m.point.y * scale;
@@ -166,7 +170,7 @@ export function FaceCanvas({
       ro.disconnect();
       window.removeEventListener("resize", draw);
     };
-  }, [markers, active, loaded, imageWidth, imageHeight]);
+  }, [markers, active, loaded, imageWidth, imageHeight, previewSrc]);
 
   const compareProps = previewSrc
     ? {
