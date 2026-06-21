@@ -3,6 +3,13 @@
 import type { Assessment } from "@/lib/assessment-schema";
 import { AREA_LABELS, DISCLAIMER } from "@/lib/assessment-schema";
 import { CLINIC } from "@/lib/clinic";
+import {
+  LOOKS,
+  DEFAULT_LOOK,
+  isSimulatable,
+  type LookKey,
+  type SimulatableArea,
+} from "@/lib/simulation";
 
 interface Props {
   assessment: Assessment;
@@ -11,6 +18,13 @@ interface Props {
   active: string | null;
   onSetActive: (area: string | null) => void;
   onBook: () => void;
+  /** Preview wiring (before/after simulation). */
+  canPreview: boolean;
+  previewArea: SimulatableArea | null;
+  previewLook: LookKey | null;
+  previewLoading: boolean;
+  previewFailed: boolean;
+  onPreview: (area: SimulatableArea, look: LookKey) => void;
 }
 
 const confidenceLabel: Record<string, string> = {
@@ -25,6 +39,12 @@ export function AssessmentResult({
   active,
   onSetActive,
   onBook,
+  canPreview,
+  previewArea,
+  previewLook,
+  previewLoading,
+  previewFailed,
+  onPreview,
 }: Props) {
   // Unique areas in marker order, for the chip row.
   const uniqueAreas = assessment.areas.filter(
@@ -93,6 +113,67 @@ export function AssessmentResult({
                   </div>
                 </div>
               ))}
+
+              {active && isSimulatable(active) && canPreview && (
+                <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-surface p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium">See your preview</p>
+                    <span className="rounded-full bg-[var(--accent)]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--accent)]">
+                      Simulated
+                    </span>
+                  </div>
+
+                  {previewFailed ? (
+                    <p className="text-sm text-neutral-500">
+                      Preview isn&apos;t available right now — your read still
+                      stands.
+                    </p>
+                  ) : previewArea === active ? (
+                    <>
+                      <div className="flex gap-2">
+                        {LOOKS.map((l) => {
+                          const on = previewLook === l.key;
+                          return (
+                            <button
+                              key={l.key}
+                              disabled={previewLoading}
+                              onClick={() => onPreview(active, l.key)}
+                              className={`flex-1 rounded-full border px-3 py-2 text-sm transition-colors disabled:opacity-50 ${
+                                on
+                                  ? "border-[var(--accent)] bg-[var(--accent)]/10 font-medium"
+                                  : "border-neutral-300 hover:border-neutral-400"
+                              }`}
+                            >
+                              {l.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-neutral-400">
+                        {previewLoading
+                          ? "Rendering your preview…"
+                          : "Press and hold the photo to compare to before."}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        disabled={previewLoading}
+                        onClick={() => onPreview(active, DEFAULT_LOOK)}
+                        className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-transform active:scale-[0.99] disabled:opacity-50"
+                      >
+                        {previewLoading
+                          ? "Rendering your preview…"
+                          : `See your ${AREA_LABELS[active].toLowerCase()} preview`}
+                      </button>
+                      <p className="text-xs text-neutral-400">
+                        A simulated look at the difference — a starting point, not
+                        a promise.
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <p className="rounded-2xl border border-dashed border-neutral-300 px-4 py-3.5 text-sm text-neutral-400">

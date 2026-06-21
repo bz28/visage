@@ -1,5 +1,3 @@
-import type { AssessmentArea } from "./assessment-schema";
-
 /**
  * Looks the patient can preview, as approximate filler amounts.
  *
@@ -27,9 +25,7 @@ export const DEFAULT_LOOK: LookKey = "natural";
 export const SIMULATABLE = ["lips", "chin", "cheeks"] as const;
 export type SimulatableArea = (typeof SIMULATABLE)[number];
 
-export function isSimulatable(
-  area: AssessmentArea["area"],
-): area is SimulatableArea {
+export function isSimulatable(area: string): area is SimulatableArea {
   return (SIMULATABLE as readonly string[]).includes(area);
 }
 

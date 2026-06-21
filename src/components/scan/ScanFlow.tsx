@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { detectFace } from "@/lib/landmarks";
+import { useRef, useState } from "react";
+import { detectFace, type Pt } from "@/lib/landmarks";
 import { computeMeasurements } from "@/lib/measurements";
 import { baselineAssessment } from "@/lib/baseline";
 import { buildAnnotations, type Marker } from "@/lib/annotations";
+import { buildAreaMask } from "@/lib/mask";
+import type { LookKey, SimulatableArea } from "@/lib/simulation";
 import type { Assessment } from "@/lib/assessment-schema";
 import type { Intake as IntakeData } from "@/lib/intake-schema";
 import type { ViewKey } from "@/lib/views";
@@ -37,6 +39,11 @@ interface Analysis {
   markers: Marker[];
   numberByArea: Record<string, number>;
 }
+interface Preview {
+  area: SimulatableArea;
+  look: LookKey;
+  src: string;
+}
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -52,9 +59,58 @@ export function ScanFlow() {
   const [intake, setIntake] = useState<IntakeData | null>(null);
   const [photos, setPhotos] = useState<Partial<Record<ViewKey, string>>>({});
   const [front, setFront] = useState<Photo | null>(null);
+  const [landmarks, setLandmarks] = useState<Pt[] | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [active, setActive] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Before/after preview state. `preview` is the after image currently shown;
+  // generated images are cached by `${area}:${look}` so flipping back is instant.
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
+  const previewCache = useRef<Record<string, string>>({});
+
+  async function requestPreview(area: SimulatableArea, look: LookKey) {
+    if (!landmarks || !front) return;
+    const key = `${area}:${look}`;
+    const cached = previewCache.current[key];
+    if (cached) {
+      setPreviewFailed(false);
+      setPreview({ area, look, src: cached });
+      return;
+    }
+    setPreviewFailed(false);
+    setPreviewLoading(true);
+    try {
+      const mask = buildAreaMask(landmarks, area, front.width, front.height);
+      const res = await fetch("/api/simulate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ image: front.dataUrl, mask, area, look }),
+      });
+      const data: { image?: string; fallback?: boolean } = await res.json();
+      if (data.image) {
+        previewCache.current[key] = data.image;
+        setPreview({ area, look, src: data.image });
+      } else {
+        setPreviewFailed(true);
+      }
+    } catch {
+      setPreviewFailed(true);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  // Switching the active area drops back to the real photo for the new area.
+  function selectActive(area: string | null) {
+    setActive(area);
+    if (area !== preview?.area) {
+      setPreview(null);
+      setPreviewFailed(false);
+    }
+  }
 
   async function analyze(images: CapturedImage[]) {
     setError(null);
@@ -91,6 +147,7 @@ export function ScanFlow() {
       }
 
       const landmarks = result.landmarks;
+      setLandmarks(landmarks);
       const measurements = computeMeasurements(landmarks);
       const baseline = baselineAssessment(measurements, intake ?? undefined);
 
@@ -132,9 +189,13 @@ export function ScanFlow() {
     setIntake(null);
     setPhotos({});
     setFront(null);
+    setLandmarks(null);
     setAnalysis(null);
     setActive(null);
     setError(null);
+    setPreview(null);
+    setPreviewFailed(false);
+    previewCache.current = {};
     setStep("intake");
   }
 
@@ -208,7 +269,8 @@ export function ScanFlow() {
                   imageHeight={front.height}
                   markers={analysis.markers}
                   active={active}
-                  onSelectArea={setActive}
+                  onSelectArea={selectActive}
+                  previewSrc={preview?.src ?? null}
                 />
               </div>
               <div className="md:flex-1">
@@ -216,8 +278,14 @@ export function ScanFlow() {
                   assessment={analysis.assessment}
                   numberByArea={analysis.numberByArea}
                   active={active}
-                  onSetActive={setActive}
+                  onSetActive={selectActive}
                   onBook={() => setStep("book")}
+                  canPreview={!!landmarks}
+                  previewLook={preview?.look ?? null}
+                  previewArea={preview?.area ?? null}
+                  previewLoading={previewLoading}
+                  previewFailed={previewFailed}
+                  onPreview={requestPreview}
                 />
               </div>
             </div>
@@ -227,6 +295,11 @@ export function ScanFlow() {
         {step === "book" && analysis && (
           <BookConsult
             interests={[...new Set(analysis.assessment.areas.map((a) => a.area))]}
+            previewedLook={
+              preview
+                ? { area: preview.area, look: preview.look }
+                : undefined
+            }
             onDone={reset}
           />
         )}
