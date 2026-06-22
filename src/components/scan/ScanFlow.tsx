@@ -104,7 +104,6 @@ export function ScanFlow() {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ image: front.dataUrl, area, look, mouthOpen }),
         });
-        if (reqId !== previewReqId.current) return; // superseded mid-flight
         const data: { image?: string; fallback?: boolean } = await res.json();
         if (!data.image) break; // server fell back (no key / refusal / error)
 
@@ -116,16 +115,25 @@ export function ScanFlow() {
           front.width,
           front.height,
         );
-        if (reqId !== previewReqId.current) return;
         if (result.ok && result.dataUrl) composited = result.dataUrl;
         else console.warn(`[preview] rejected, retrying: ${result.reason}`);
+        // Stop burning paid generations for an area the user has navigated away
+        // from — but we still keep any good result from this attempt below.
+        if (reqId !== previewReqId.current) break;
       }
 
+      // Cache regardless of whether this is still the active request — the API
+      // call was already paid for, so navigating back should reuse it (instant),
+      // not re-generate.
       if (composited) {
         previewCache.current[key] = composited;
         lastLookByArea.current[area] = look;
-        setPreview({ area, look, src: composited });
-      } else setPreviewFailed(true);
+      }
+
+      // Only touch the UI if this request is still the current one.
+      if (reqId !== previewReqId.current) return;
+      if (composited) setPreview({ area, look, src: composited });
+      else setPreviewFailed(true);
     } catch {
       if (reqId === previewReqId.current) setPreviewFailed(true);
     } finally {
