@@ -43,8 +43,12 @@ async function waitForServer(timeoutMs) {
 
 async function main() {
   log("starting next dev with mocks…");
+  // detached so the whole process group (npm → next dev → Turbopack workers) can
+  // be killed together — SIGTERM to npm alone leaves orphans that keep node's
+  // event loop alive and hang CI.
   const server = spawn("npm", ["run", "dev"], {
     cwd: ROOT,
+    detached: true,
     env: {
       ...process.env,
       PORT,
@@ -55,6 +59,15 @@ async function main() {
   });
   server.stdout.on("data", () => {});
   server.stderr.on("data", () => {});
+
+  const stopServer = () => {
+    try {
+      // negative pid = kill the whole process group
+      if (server.pid) process.kill(-server.pid, "SIGKILL");
+    } catch {
+      // already gone
+    }
+  };
 
   let browser;
   const fail = (msg) => {
@@ -143,11 +156,14 @@ async function main() {
     log("PASS ✓");
   } finally {
     if (browser) await browser.close().catch(() => {});
-    server.kill("SIGTERM");
+    stopServer();
   }
 }
 
-main().catch((err) => {
-  console.error(`[e2e] FAIL ✗ ${err.message}`);
-  process.exit(1);
-});
+main().then(
+  () => process.exit(0),
+  (err) => {
+    console.error(`[e2e] FAIL ✗ ${err.message}`);
+    process.exit(1);
+  },
+);
