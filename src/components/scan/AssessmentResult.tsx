@@ -124,6 +124,13 @@ export function AssessmentResult({
                     </span>
                   </div>
 
+                  {(active === "chin" || active === "jawline") && (
+                    <p className="text-xs leading-relaxed text-neutral-400">
+                      A front photo shows this area only subtly — it&apos;s best
+                      seen in profile, in person.
+                    </p>
+                  )}
+
                   {previewArea === active ? (
                     /* We already have a working preview for this area — keep the
                        selector up; a failed look just shows a gentle hint. */
