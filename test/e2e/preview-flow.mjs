@@ -98,7 +98,25 @@ async function main() {
     await page.getByRole("button", { name: /See my read/i }).click();
 
     log("waiting for the read…");
-    await page.getByText(/explore together/i).first().waitFor({ timeout: 60_000 });
+    // Match the result heading specifically (intake copy also says "explore
+    // together"). On timeout, surface the capture error so a fixture that fails
+    // face-detection reports the real cause instead of a bare hang.
+    try {
+      await page
+        .getByRole("heading", { name: /explore together/i })
+        .waitFor({ timeout: 60_000 });
+    } catch {
+      const err = await page
+        .locator(".bg-amber-50")
+        .first()
+        .textContent()
+        .catch(() => null);
+      throw new Error(
+        err
+          ? `stuck on capture — fixture face likely not detected: "${err.trim()}"`
+          : "result screen never appeared",
+      );
+    }
 
     // Tap the first area chip, then request its preview.
     const areaChip = page.locator('button:has-text("Lips"), button:has-text("Chin"), button:has-text("Cheeks"), button:has-text("Jawline")').first();
