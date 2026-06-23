@@ -13,7 +13,7 @@ import type { ViewKey } from "@/lib/views";
 import { Intake } from "./Intake";
 import { Capture, type CapturedImage } from "./Capture";
 import { Analyzing } from "./Analyzing";
-import { FaceCanvas } from "./FaceCanvas";
+import { BeforeAfter } from "./BeforeAfter";
 import { AssessmentResult } from "./AssessmentResult";
 import { BookConsult } from "./BookConsult";
 import { StepProgress } from "./StepProgress";
@@ -339,55 +339,21 @@ export function ScanFlow() {
               </p>
             </header>
 
-            {/* Side-by-side before / after — the combined optimal result. */}
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <figure className="flex flex-col gap-2">
-                <FaceCanvas
-                  dataUrl={front.dataUrl}
-                  imageWidth={front.width}
-                  imageHeight={front.height}
-                  markers={analysis.markers.filter((m) => selected.has(m.area))}
-                />
-                <figcaption className="text-center text-xs font-medium uppercase tracking-wide text-neutral-400">
-                  Now
-                </figcaption>
-              </figure>
-              <figure className="flex flex-col gap-2">
-                <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl bg-neutral-100 shadow-sm">
-                  {combinedSrc ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      src={combinedSrc}
-                      alt="Simulated result with the recommended treatment"
-                      className="size-full object-cover"
-                    />
-                  ) : combinedLoading ? (
-                    <div className="flex flex-col items-center gap-2 text-center">
-                      <span className="size-5 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
-                      <span className="px-3 text-xs text-neutral-500">
-                        Creating your preview…
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="px-3 text-center text-xs text-neutral-400">
-                      {combinedFailed
-                        ? "Preview unavailable — your read still stands."
-                        : ![...selected].some(isSimulatable)
-                          ? "Select an area below to preview it."
-                          : "Preview"}
-                    </span>
-                  )}
-                  {combinedSrc && (
-                    <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-0.5 text-[10px] font-semibold text-white">
-                      Simulated
-                    </span>
-                  )}
-                </div>
-                <figcaption className="text-center text-xs font-medium uppercase tracking-wide text-[var(--accent)]">
-                  With treatment
-                </figcaption>
-              </figure>
-            </div>
+            <BeforeAfter
+              beforeSrc={front.dataUrl}
+              afterSrc={combinedSrc}
+              imageWidth={front.width}
+              imageHeight={front.height}
+              markers={analysis.markers.filter((m) => selected.has(m.area))}
+              loading={combinedLoading}
+              placeholder={
+                combinedFailed
+                  ? "Preview unavailable — your read still stands."
+                  : ![...selected].some(isSimulatable)
+                    ? "Select an area below to preview it."
+                    : undefined
+              }
+            />
 
             <AssessmentResult
               assessment={analysis.assessment}
