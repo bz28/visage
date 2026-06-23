@@ -56,6 +56,8 @@ export function ScanFlow() {
   const [front, setFront] = useState<Photo | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Area whose pin is emphasized on the photo (hovered/tapped in the plan).
+  const [highlightedArea, setHighlightedArea] = useState<string | null>(null);
 
   // The patient's combined before/after. We generate ONE "after" with every
   // recommended area at the optimal amount, cache the raw AI output (the one
@@ -264,6 +266,7 @@ export function ScanFlow() {
     setFront(null);
     setAnalysis(null);
     setError(null);
+    setHighlightedArea(null);
     genId.current++; // invalidate any in-flight combined generation
     setCombinedSrc(null);
     setCombinedFailed(false);
@@ -345,6 +348,7 @@ export function ScanFlow() {
               imageWidth={front.width}
               imageHeight={front.height}
               markers={analysis.markers.filter((m) => selected.has(m.area))}
+              highlightedArea={highlightedArea}
               loading={combinedLoading}
               placeholder={
                 combinedFailed
@@ -359,6 +363,7 @@ export function ScanFlow() {
               assessment={analysis.assessment}
               selected={selected}
               onToggle={toggleArea}
+              onHighlight={setHighlightedArea}
               onBook={() => setStep("book")}
             />
           </div>

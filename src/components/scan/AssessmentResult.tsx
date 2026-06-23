@@ -10,19 +10,24 @@ interface Props {
   selected: Set<string>;
   /** Toggle an area in/out of the preview. */
   onToggle: (area: string) => void;
+  /** Highlight an area's pin on the photo (null clears). */
+  onHighlight: (area: string | null) => void;
   onBook: () => void;
 }
 
 /**
  * The patient result is deliberately simple (surgeon's direction): a short
- * treatment-plan checklist, then the booking CTA. Each area is a toggle — tap to
- * include/remove it from the before/after (we re-paste a subset of the same
- * generation, no new render). Per-area amount editing is the clinician tool.
+ * treatment-plan list, then the booking CTA. Each area shows its explanation
+ * (always visible) with an explicit "In preview" switch — the switch is the only
+ * thing that adds/removes the area from the before/after (we re-paste a subset of
+ * the same generation, no new render). Hovering/tapping a card highlights that
+ * area's pin on the photo. Per-area amount editing is the clinician tool.
  */
 export function AssessmentResult({
   assessment,
   selected,
   onToggle,
+  onHighlight,
   onBook,
 }: Props) {
   const uniqueAreas = assessment.areas.filter(
@@ -38,42 +43,34 @@ export function AssessmentResult({
               Your treatment plan
             </p>
             {uniqueAreas.length > 1 && (
-              <p className="text-xs text-neutral-400">Tap an area to compare</p>
+              <p className="text-xs text-neutral-400">
+                Switch any area off to compare
+              </p>
             )}
           </div>
           <ul className="flex flex-col gap-3">
             {uniqueAreas.map((a) => {
               const on = selected.has(a.area);
+              const label = AREA_LABELS[a.area];
               return (
-                <li key={a.area}>
-                  <button
-                    type="button"
-                    onClick={() => onToggle(a.area)}
-                    aria-pressed={on}
-                    className={`flex w-full gap-3 rounded-2xl border p-4 text-left transition-colors ${
-                      on
-                        ? "border-border bg-surface"
-                        : "border-dashed border-neutral-300 bg-transparent"
-                    }`}
-                  >
-                    <span
-                      className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full transition-colors ${
-                        on
-                          ? "bg-[var(--accent)] text-white"
-                          : "border border-neutral-300 text-transparent"
-                      }`}
-                    >
-                      <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4L19 7" />
-                      </svg>
-                    </span>
-                    <div className={on ? "" : "opacity-55"}>
-                      <p className="font-medium">{AREA_LABELS[a.area]}</p>
-                      <p className="mt-0.5 text-sm leading-relaxed text-neutral-500">
-                        {a.why}
-                      </p>
-                    </div>
-                  </button>
+                <li
+                  key={a.area}
+                  onMouseEnter={() => onHighlight(a.area)}
+                  onMouseLeave={() => onHighlight(null)}
+                  onClick={() => onHighlight(a.area)}
+                  className={`flex items-start justify-between gap-3 rounded-2xl border p-4 transition-colors ${
+                    on
+                      ? "border-border bg-surface hover:border-neutral-300"
+                      : "border-dashed border-neutral-300 bg-transparent"
+                  }`}
+                >
+                  <div className={on ? "" : "opacity-55"}>
+                    <p className="font-medium">{label}</p>
+                    <p className="mt-0.5 text-sm leading-relaxed text-neutral-500">
+                      {a.why}
+                    </p>
+                  </div>
+                  <Switch on={on} label={label} onToggle={() => onToggle(a.area)} />
                 </li>
               );
             })}
@@ -116,5 +113,48 @@ export function AssessmentResult({
         </p>
       </div>
     </div>
+  );
+}
+
+function Switch({
+  on,
+  label,
+  onToggle,
+}: {
+  on: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={`${label} in preview`}
+      onClick={(e) => {
+        e.stopPropagation(); // don't also trigger the card's highlight
+        onToggle();
+      }}
+      className="flex shrink-0 items-center gap-2"
+    >
+      <span
+        className={`text-[11px] font-medium uppercase tracking-wide ${
+          on ? "text-[var(--accent)]" : "text-neutral-400"
+        }`}
+      >
+        {on ? "In preview" : "Off"}
+      </span>
+      <span
+        className={`relative h-5 w-9 rounded-full transition-colors ${
+          on ? "bg-[var(--accent)]" : "bg-neutral-300"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition-all ${
+            on ? "left-[18px]" : "left-0.5"
+          }`}
+        />
+      </span>
+    </button>
   );
 }

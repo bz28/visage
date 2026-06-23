@@ -11,6 +11,8 @@ interface Props {
   imageHeight: number;
   /** Pins drawn over the "now" photo (already filtered to selected areas). */
   markers: Marker[];
+  /** Area to emphasize (hovered/tapped in the plan); dims the others. */
+  highlightedArea?: string | null;
   loading: boolean;
   /** Shown over the photo when there's no "after" and we're not loading. */
   placeholder?: string;
@@ -30,6 +32,7 @@ export function BeforeAfter({
   imageWidth,
   imageHeight,
   markers,
+  highlightedArea,
   loading,
   placeholder,
 }: Props) {
@@ -117,7 +120,7 @@ export function BeforeAfter({
           <div className="grid size-full grid-cols-2">
             <div className="relative overflow-hidden border-r border-white/60">
               <Photo src={beforeSrc} />
-              <Pins markers={markers} imageWidth={imageWidth} imageHeight={imageHeight} />
+              <Pins markers={markers} imageWidth={imageWidth} imageHeight={imageHeight} highlightedArea={highlightedArea} />
               <Caption side="left">Now</Caption>
             </div>
             <div className="relative overflow-hidden">
@@ -142,7 +145,7 @@ export function BeforeAfter({
               }}
             >
               <Photo src={beforeSrc} />
-              <Pins markers={markers} imageWidth={imageWidth} imageHeight={imageHeight} />
+              <Pins markers={markers} imageWidth={imageWidth} imageHeight={imageHeight} highlightedArea={highlightedArea} />
             </div>
 
             {showAfter && (
@@ -238,28 +241,40 @@ function Pins({
   markers,
   imageWidth,
   imageHeight,
+  highlightedArea,
 }: {
   markers: Marker[];
   imageWidth: number;
   imageHeight: number;
+  highlightedArea?: string | null;
 }) {
   return (
     <>
-      {markers.map((m) => (
-        <div
-          key={m.area}
-          className="pointer-events-none absolute flex -translate-x-1/2 flex-col items-center gap-1"
-          style={{
-            left: `${(m.point.x / imageWidth) * 100}%`,
-            top: `${(m.point.y / imageHeight) * 100}%`,
-          }}
-        >
-          <span className="size-2 rounded-full bg-[var(--accent)] ring-2 ring-white/90" />
-          <span className="whitespace-nowrap rounded-full bg-black/75 px-2 py-0.5 text-[11px] font-semibold text-white">
-            {AREA_LABELS[m.area]}
-          </span>
-        </div>
-      ))}
+      {markers.map((m) => {
+        const hi = m.area === highlightedArea;
+        const dim = !!highlightedArea && !hi;
+        return (
+          <div
+            key={m.area}
+            className={`pointer-events-none absolute flex -translate-x-1/2 flex-col items-center gap-1 transition-all duration-200 ${
+              dim ? "opacity-30" : "opacity-100"
+            } ${hi ? "z-10 scale-110" : ""}`}
+            style={{
+              left: `${(m.point.x / imageWidth) * 100}%`,
+              top: `${(m.point.y / imageHeight) * 100}%`,
+            }}
+          >
+            <span
+              className={`rounded-full bg-[var(--accent)] transition-all ${
+                hi ? "size-2.5 ring-4 ring-[var(--accent)]/30" : "size-2 ring-2 ring-white/90"
+              }`}
+            />
+            <span className="whitespace-nowrap rounded-full bg-black/75 px-2 py-0.5 text-[11px] font-semibold text-white">
+              {AREA_LABELS[m.area]}
+            </span>
+          </div>
+        );
+      })}
     </>
   );
 }
