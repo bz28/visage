@@ -6,17 +6,15 @@ import { CLINIC } from "@/lib/clinic";
 
 interface Props {
   assessment: Assessment;
-  /** area key → marker number, matching the dots on the photo. */
-  numberByArea: Record<string, number>;
   onBook: () => void;
 }
 
 /**
  * The patient result is deliberately simple (surgeon's direction): a short
- * treatment-plan checklist tied to the numbered markers on the photo, then the
+ * treatment-plan checklist (the photo already labels each area), then the
  * booking CTA. The detailed per-area editing lives in the future clinician tool.
  */
-export function AssessmentResult({ assessment, numberByArea, onBook }: Props) {
+export function AssessmentResult({ assessment, onBook }: Props) {
   const uniqueAreas = assessment.areas.filter(
     (a, i) => assessment.areas.findIndex((b) => b.area === a.area) === i,
   );
@@ -34,8 +32,10 @@ export function AssessmentResult({ assessment, numberByArea, onBook }: Props) {
                 key={a.area}
                 className="flex gap-3 rounded-2xl border border-border bg-surface p-4"
               >
-                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[11px] font-bold text-white">
-                  {numberByArea[a.area]}
+                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white">
+                  <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4L19 7" />
+                  </svg>
                 </span>
                 <div>
                   <p className="font-medium">{AREA_LABELS[a.area]}</p>

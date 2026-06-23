@@ -37,7 +37,7 @@ interface Photo {
 interface Analysis {
   assessment: Assessment;
   markers: Marker[];
-  numberByArea: Record<string, number>;
+  landmarks: Pt[];
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -162,11 +162,8 @@ export function ScanFlow() {
         // keep baseline
       }
 
-      const { markers, numberByArea } = buildAnnotations(
-        assessment.areas,
-        landmarks,
-      );
-      setAnalysis({ assessment, markers, numberByArea });
+      const { markers } = buildAnnotations(assessment.areas, landmarks);
+      setAnalysis({ assessment, markers, landmarks });
       setStep("result");
 
       // Kick off the combined before/after in the background so it's rendering
@@ -270,6 +267,7 @@ export function ScanFlow() {
                   dataUrl={front.dataUrl}
                   imageWidth={front.width}
                   imageHeight={front.height}
+                  landmarks={analysis.landmarks}
                   markers={analysis.markers}
                 />
                 <figcaption className="text-center text-xs font-medium uppercase tracking-wide text-neutral-400">
@@ -313,7 +311,6 @@ export function ScanFlow() {
 
             <AssessmentResult
               assessment={analysis.assessment}
-              numberByArea={analysis.numberByArea}
               onBook={() => setStep("book")}
             />
           </div>

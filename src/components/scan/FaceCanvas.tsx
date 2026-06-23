@@ -2,73 +2,38 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Marker } from "@/lib/annotations";
+import type { Pt } from "@/lib/landmarks";
 import { AREA_LABELS } from "@/lib/assessment-schema";
+import { paintAreaRegion } from "@/lib/face-regions";
+import { isSimulatable } from "@/lib/simulation";
 
 interface Props {
   dataUrl: string;
   imageWidth: number;
   imageHeight: number;
+  /** Full landmark set — used to draw the soft region highlights. */
+  landmarks: Pt[];
+  /** One per recommended area, for the label position + which areas. */
   markers: Marker[];
-  /** Area to emphasize (hovered/tapped in the list). */
-  active?: string | null;
-  /** Called when a marker on the photo is tapped (null if tapped empty space). */
-  onSelectArea?: (area: string | null) => void;
-  /** AI-generated "after" image to overlay; press-and-hold reveals the before. */
-  previewSrc?: string | null;
-  /** A preview is currently generating — show a gentle shimmer. */
-  previewLoading?: boolean;
 }
 
-// The user's own photo with numbered markers (the read), drawn on a canvas.
-// The AI "after" is a separate DOM layer that crossfades over the canvas, so the
-// reveal and press-and-hold compare are smooth and the markers fade rather than
-// snap. Sizes to its container with a height cap so it fits a desktop column or
-// a capped mobile block without forcing scroll.
+/**
+ * The patient's own photo with each recommended area shown as a soft accent glow
+ * over the actual region + a label — so it reads "here's your jawline" directly,
+ * no number-matching. Sizes to its container with a height cap.
+ */
 export function FaceCanvas({
   dataUrl,
   imageWidth,
   imageHeight,
+  landmarks,
   markers,
-  active,
-  onSelectArea,
-  previewSrc,
-  previewLoading,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [loaded, setLoaded] = useState(0);
-  // The src of the most recently decoded "after"; ready when it matches the
-  // current previewSrc (derived, so it clears automatically on source change).
-  const [readySrc, setReadySrc] = useState<string | null>(null);
-  const [comparing, setComparing] = useState(false);
 
-  const afterReady = !!previewSrc && readySrc === previewSrc;
-  // The "after" is shown when loaded and the user isn't holding to compare.
-  const showingAfter = afterReady && !comparing;
-
-  function handleClick(e: React.MouseEvent) {
-    // While previewing, the photo is a hold-to-compare surface, not a picker.
-    if (!onSelectArea || previewSrc) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const scale = rect.width / imageWidth;
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    let hit: string | null = null;
-    let best = 24; // px touch radius
-    for (const m of markers) {
-      const d = Math.hypot(m.point.x * scale - x, m.point.y * scale - y);
-      if (d < best) {
-        best = d;
-        hit = m.area;
-      }
-    }
-    onSelectArea(hit && hit === active ? null : hit);
-  }
-
-  // Load (or reload) the base image only when the source changes.
   useEffect(() => {
     const img = new Image();
     img.onload = () => {
@@ -81,8 +46,6 @@ export function FaceCanvas({
     };
   }, [dataUrl]);
 
-  // Draw the before photo + markers on the canvas (no preview here — that's the
-  // crossfading DOM layer below).
   useEffect(() => {
     const wrap = wrapRef.current;
     const canvas = canvasRef.current;
@@ -95,12 +58,10 @@ export function FaceCanvas({
       if (!ctx) return;
 
       const availW = wrap.clientWidth || imageWidth;
-      // Let the photo breathe on desktop (immersive read); stay capped on mobile
-      // so it never forces scroll past the fold.
       const desktop = window.innerWidth >= 768;
       const maxH = Math.min(
-        desktop ? 640 : 460,
-        window.innerHeight * (desktop ? 0.72 : 0.5),
+        desktop ? 560 : 420,
+        window.innerHeight * (desktop ? 0.7 : 0.5),
       );
       const scale = Math.min(availW / imageWidth, maxH / imageHeight);
       const cssW = imageWidth * scale;
@@ -120,115 +81,62 @@ export function FaceCanvas({
         getComputedStyle(document.documentElement)
           .getPropertyValue("--accent")
           .trim() || "#b8895f";
+      const lm = landmarks.map((p) => ({ x: p.x * scale, y: p.y * scale }));
 
-      // In preview mode the canvas is only seen during press-and-hold compare —
-      // keep it a clean "before", no markers covering the face.
-      if (previewSrc) return;
-
+      // Soft glow over each treated region. Two passes (a brighter highlight
+      // core + the accent) so it reads on any skin tone without looking garish.
       for (const m of markers) {
-        const x = m.point.x * scale;
-        const y = m.point.y * scale;
-        const isActive = active === m.area;
-        const r = isActive ? 15 : 12;
+        if (!isSimulatable(m.area)) continue;
+        ctx.globalAlpha = 0.4;
+        paintAreaRegion(ctx, lm, m.area, cssW, cssH, accent);
+        ctx.globalAlpha = 0.22;
+        paintAreaRegion(ctx, lm, m.area, cssW, cssH, "#fff");
+      }
+      ctx.globalAlpha = 1;
 
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fillStyle = accent;
-        ctx.globalAlpha = isActive ? 1 : 0.9;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.lineWidth = isActive ? 3 : 2;
-        ctx.strokeStyle = "#fff";
-        ctx.stroke();
-
-        ctx.fillStyle = "#fff";
-        ctx.font = `700 ${isActive ? 15 : 12}px ui-sans-serif, system-ui, sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(String(m.n), x, y + 0.5);
-
-        if (isActive) {
-          const label = AREA_LABELS[m.area];
-          ctx.font = "600 13px ui-sans-serif, system-ui, sans-serif";
-          ctx.textAlign = "left";
-          const w = ctx.measureText(label).width + 16;
-          ctx.fillStyle = "rgba(15,15,15,0.9)";
-          ctx.fillRect(x + r + 4, y - 13, w, 26);
-          ctx.fillStyle = "#fff";
-          ctx.fillText(label, x + r + 12, y + 1);
-        }
+      // A label pill per area, at its point.
+      for (const m of markers) {
+        drawLabel(ctx, AREA_LABELS[m.area], m.point.x * scale, m.point.y * scale);
       }
     }
 
     draw();
     const ro = new ResizeObserver(() => draw());
     ro.observe(wrap);
-    // ResizeObserver only watches width; also redraw on viewport-height changes
-    // (mobile URL bar show/hide) so the height cap stays current.
     window.addEventListener("resize", draw);
     return () => {
       ro.disconnect();
       window.removeEventListener("resize", draw);
     };
-  }, [markers, active, loaded, imageWidth, imageHeight, previewSrc]);
-
-  const compareProps = previewSrc
-    ? {
-        onPointerDown: () => setComparing(true),
-        onPointerUp: () => setComparing(false),
-        onPointerLeave: () => setComparing(false),
-        onPointerCancel: () => setComparing(false),
-      }
-    : {};
+  }, [markers, landmarks, loaded, imageWidth, imageHeight]);
 
   return (
     <div ref={wrapRef} className="flex justify-center">
-      <div
-        className="relative select-none"
-        {...compareProps}
-        aria-label={
-          previewSrc
-            ? "Simulated preview of your photo — press and hold to compare to before"
-            : "Your photo with the areas an injector might discuss marked"
-        }
-      >
-        <canvas
-          ref={canvasRef}
-          onClick={handleClick}
-          className={`block touch-none rounded-2xl shadow-sm ${
-            onSelectArea && !previewSrc ? "cursor-pointer" : ""
-          } ${previewSrc ? "cursor-pointer" : ""}`}
-        />
-
-        {/* AI "after" — crossfades over the canvas so the reveal and the
-            hold-to-compare are smooth, and the markers fade rather than snap. */}
-        {previewSrc && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={previewSrc}
-            alt=""
-            onLoad={() => setReadySrc(previewSrc)}
-            draggable={false}
-            className="pointer-events-none absolute inset-0 size-full rounded-2xl object-cover transition-opacity duration-300 ease-out"
-            style={{ opacity: showingAfter ? 1 : 0 }}
-          />
-        )}
-
-        {/* A small badge so it's unmistakable which image is on screen. */}
-        {previewSrc && afterReady && (
-          <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/75 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm transition-opacity duration-300">
-            {showingAfter ? "Simulated preview" : "Before"}
-          </div>
-        )}
-
-        {/* Gentle shimmer while a preview generates. */}
-        {previewLoading && (
-          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-            <div className="absolute inset-0 bg-black/10" />
-            <div className="scan-sweep absolute inset-x-0 h-1/3 bg-gradient-to-b from-transparent via-white/30 to-transparent" />
-          </div>
-        )}
-      </div>
+      <canvas
+        ref={canvasRef}
+        className="block rounded-2xl shadow-sm"
+        aria-label="Your photo with the areas we'd explore highlighted"
+      />
     </div>
   );
+}
+
+function drawLabel(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+) {
+  ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const padX = 9;
+  const h = 21;
+  const w = ctx.measureText(text).width + padX * 2;
+  ctx.fillStyle = "rgba(15,15,15,0.8)";
+  ctx.beginPath();
+  ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2);
+  ctx.fill();
+  ctx.fillStyle = "#fff";
+  ctx.fillText(text, x, y + 0.5);
 }

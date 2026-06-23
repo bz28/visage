@@ -1,4 +1,5 @@
-import { detectFace, KEY, REGIONS, type Pt } from "./landmarks";
+import { detectFace, KEY, type Pt } from "./landmarks";
+import { paintAreaRegion } from "./face-regions";
 import type { SimulatableArea } from "./simulation";
 
 /**
@@ -42,69 +43,6 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     img.onerror = reject;
     img.src = src;
   });
-}
-
-/** Trace the feathered region we keep from the generated image, per area. */
-function clipRegion(
-  ctx: CanvasRenderingContext2D,
-  lm: Pt[],
-  area: SimulatableArea,
-  w: number,
-  h: number,
-) {
-  const dilate = Math.max(6, Math.hypot(w, h) * 0.012);
-  ctx.fillStyle = "#fff";
-  ctx.strokeStyle = "#fff";
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  ctx.lineWidth = dilate * 2;
-  ctx.filter = `blur(${dilate * 0.6}px)`;
-
-  const poly = (idx: readonly number[]) => {
-    const pts = idx.map((i) => lm[i]).filter(Boolean);
-    if (pts.length < 3) return;
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-  };
-
-  switch (area) {
-    case "lips":
-      poly(REGIONS.outerLip);
-      break;
-    case "cheeks":
-      poly(REGIONS.leftCheek);
-      poly(REGIONS.rightCheek);
-      break;
-    case "jawline": {
-      const pts = REGIONS.jawline.map((i) => lm[i]).filter(Boolean);
-      if (pts.length >= 3) {
-        ctx.lineWidth = dilate * 3.5;
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-        ctx.stroke();
-      }
-      break;
-    }
-    case "chin": {
-      const lip = lm[KEY.lowerLipBottom];
-      const menton = lm[KEY.menton];
-      if (lip && menton) {
-        const cx = (lip.x + menton.x) / 2;
-        const cy = (lip.y + menton.y) / 2 + (menton.y - lip.y) * 0.25;
-        const ry = Math.abs(menton.y - lip.y) * 0.9;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, ry * 0.9, ry, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      break;
-    }
-  }
-  ctx.filter = "none";
 }
 
 /**
@@ -170,7 +108,9 @@ export async function compositeAreas(
   mask.height = height;
   const mctx = mask.getContext("2d");
   if (!mctx) return { ok: false, reason: "no canvas context" };
-  for (const area of areas) clipRegion(mctx, originalLm, area, width, height);
+  for (const area of areas) {
+    paintAreaRegion(mctx, originalLm, area, width, height, "#fff");
+  }
 
   // Offscreen: aligned generated image, then keep only the union of regions.
   const off = document.createElement("canvas");
