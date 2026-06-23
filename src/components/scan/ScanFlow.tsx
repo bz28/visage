@@ -290,7 +290,11 @@ export function ScanFlow() {
                 {error}
               </p>
             )}
-            <Capture initialPhotos={photos} onDone={analyze} />
+            <Capture
+              initialPhotos={photos}
+              goals={intake?.goals ?? []}
+              onDone={analyze}
+            />
           </div>
         )}
 

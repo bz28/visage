@@ -27,10 +27,14 @@ interface Props {
   onPreview: (area: SimulatableArea, look: LookKey) => void;
 }
 
+// Anchored to OUR read of the photo, not the patient's "need" — confidence is a
+// data-quality signal (how clearly we could see it), so "worth a look"/"worth
+// discussing" wrongly read as urgency/judgment. Now that retake / add-a-side are
+// handled at capture, this just states how sure the read is.
 const confidenceLabel: Record<string, string> = {
-  low: "Subtle — best judged in person",
-  medium: "Worth discussing",
-  high: "Clearly worth a look",
+  low: "Subtle — best confirmed in person",
+  medium: "A fairly clear read",
+  high: "Clear from your photo",
 };
 
 export function AssessmentResult({

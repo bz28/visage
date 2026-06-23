@@ -17,6 +17,7 @@ import { chromium } from "playwright-core";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..", "..");
 const FIXTURE = join(__dirname, "..", "fixtures", "test-face.jpg");
+const NO_FACE = join(__dirname, "..", "fixtures", "no-face.jpg");
 const PORT = process.env.E2E_PORT || "3100";
 const BASE = `http://localhost:${PORT}`;
 
@@ -107,8 +108,24 @@ async function main() {
         if (i === 4) throw new Error("intake never advanced to capture");
       }
     }
+    // Capture hard-gate: a no-face photo must be rejected at capture.
+    log("checking no-face photo is rejected…");
+    await fileInput.setInputFiles(NO_FACE);
+    await page
+      .getByText(/couldn't find a face/i)
+      .waitFor({ timeout: 30_000 });
+    log("no-face correctly rejected ✓");
+
+    // Now the real face. It may surface a soft framing warning — accept it.
     await fileInput.setInputFiles(FIXTURE);
-    await page.getByRole("button", { name: /See my read/i }).click();
+    const useAnyway = page.getByRole("button", { name: /Use anyway/i });
+    const seeRead = page.getByRole("button", { name: /See my read/i });
+    await Promise.race([
+      useAnyway.waitFor({ timeout: 30_000 }).catch(() => {}),
+      seeRead.waitFor({ timeout: 30_000 }).catch(() => {}),
+    ]);
+    if (await useAnyway.isVisible().catch(() => false)) await useAnyway.click();
+    await seeRead.click();
 
     log("waiting for the read…");
     // Match the result heading specifically (intake copy also says "explore

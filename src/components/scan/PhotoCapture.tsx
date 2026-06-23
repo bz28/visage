@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ViewKey } from "@/lib/views";
+import { checkPhoto, warningMessage } from "@/lib/photo-check";
 import { PoseIllustration } from "./PoseIllustration";
 
 interface Props {
@@ -14,7 +15,9 @@ interface Props {
 
 /**
  * Captures one view (camera or upload) with an on-screen guide + instruction so
- * the photo is usable. Nothing uploads here — the parent collects the shots.
+ * the photo is usable. Each shot is checked on-device BEFORE it's accepted —
+ * a missing face is a hard retake; a tilted/too-small/off-center front photo is
+ * a skippable nudge. Nothing uploads here — the parent collects the shots.
  */
 export function PhotoCapture({
   view,
@@ -25,10 +28,42 @@ export function PhotoCapture({
 }: Props) {
   const [mode, setMode] = useState<"choose" | "camera">("choose");
   const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  // A shot that passed face-detection but has a soft warning — show it with
+  // Retake / Use anyway rather than silently accepting or blocking.
+  const [pending, setPending] = useState<{ dataUrl: string; message: string } | null>(
+    null,
+  );
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const mountedRef = useRef(true);
+
+  // Run the on-device check, then route: hard-gate, soft-warn, or accept.
+  async function handleCaptured(dataUrl: string) {
+    setError(null);
+    setChecking(true);
+    const check = await checkPhoto(dataUrl, view);
+    if (!mountedRef.current) return;
+    setChecking(false);
+    if (check.status === "no-face") {
+      setMode("choose");
+      setError(
+        "We couldn't find a face in that photo — a clear, well-lit shot, straight on, works best.",
+      );
+      return;
+    }
+    if (check.status === "multiple-faces") {
+      setMode("choose");
+      setError("We see more than one face — a solo photo works best.");
+      return;
+    }
+    if (check.warnings.length > 0) {
+      setPending({ dataUrl, message: warningMessage(check.warnings) });
+      return;
+    }
+    onCapture(dataUrl);
+  }
 
   useEffect(() => {
     // Reset on (re)mount — Strict Mode mounts twice, and the first cleanup
@@ -72,15 +107,57 @@ export function PhotoCapture({
     canvas.height = video.videoHeight;
     canvas.getContext("2d")?.drawImage(video, 0, 0);
     streamRef.current?.getTracks().forEach((t) => t.stop());
-    onCapture(canvas.toDataURL("image/jpeg", 0.92));
+    handleCaptured(canvas.toDataURL("image/jpeg", 0.92));
   }
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => onCapture(reader.result as string);
+    reader.onload = () => handleCaptured(reader.result as string);
     reader.readAsDataURL(file);
+  }
+
+  if (checking) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-12 text-center">
+        <span className="size-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+        <p className="text-sm text-neutral-500">Checking your photo…</p>
+      </div>
+    );
+  }
+
+  if (pending) {
+    return (
+      <div className="flex flex-col items-center gap-5 text-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={pending.dataUrl}
+          alt=""
+          className="w-full max-w-xs rounded-2xl"
+        />
+        <p className="mx-auto max-w-xs text-sm leading-relaxed text-neutral-600">
+          {pending.message}
+        </p>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <button
+            onClick={() => {
+              setPending(null);
+              setMode("choose");
+            }}
+            className="rounded-full bg-foreground px-7 py-3 font-medium text-background"
+          >
+            Retake
+          </button>
+          <button
+            onClick={() => onCapture(pending.dataUrl)}
+            className="rounded-full border border-neutral-300 px-7 py-3 font-medium"
+          >
+            Use anyway
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (mode === "camera") {
