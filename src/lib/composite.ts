@@ -107,10 +107,16 @@ function clipRegion(
   ctx.filter = "none";
 }
 
-export async function compositeArea(
+/**
+ * Composite the treated regions of the AI output back onto the patient's
+ * original photo — `areas` may be one (clinician per-area editing) or all of
+ * them at once (the patient's single combined result). Everything outside the
+ * union of the regions stays the original pixels.
+ */
+export async function compositeAreas(
   originalDataUrl: string,
   originalLm: Pt[],
-  area: SimulatableArea,
+  areas: SimulatableArea[],
   generatedDataUrl: string,
   width: number,
   height: number,
@@ -127,9 +133,9 @@ export async function compositeArea(
   }
   const genLm = det.landmarks;
 
-  // Verify: for lip edits, the mouth must not have opened/closed (the one thing
-  // the composite can't fix, since the lip region IS the mouth).
-  if (area === "lips") {
+  // Verify: if lips are edited, the mouth must not have opened/closed (the one
+  // thing the composite can't fix, since the lip region IS the mouth).
+  if (areas.includes("lips")) {
     const openO = mouthOpenness(originalLm);
     const openG = mouthOpenness(genLm);
     if (Math.abs(openG - openO) > 0.05) {
@@ -157,7 +163,16 @@ export async function compositeArea(
   if (!ctx) return { ok: false, reason: "no canvas context" };
   ctx.drawImage(orig, 0, 0, width, height);
 
-  // Offscreen: aligned generated image, then keep only the feathered region.
+  // Build the union mask of all treated regions (drawn source-over so they add,
+  // not intersect).
+  const mask = document.createElement("canvas");
+  mask.width = width;
+  mask.height = height;
+  const mctx = mask.getContext("2d");
+  if (!mctx) return { ok: false, reason: "no canvas context" };
+  for (const area of areas) clipRegion(mctx, originalLm, area, width, height);
+
+  // Offscreen: aligned generated image, then keep only the union of regions.
   const off = document.createElement("canvas");
   off.width = width;
   off.height = height;
@@ -171,7 +186,7 @@ export async function compositeArea(
   octx.drawImage(gen, 0, 0);
   octx.restore();
   octx.globalCompositeOperation = "destination-in";
-  clipRegion(octx, originalLm, area, width, height);
+  octx.drawImage(mask, 0, 0);
   octx.globalCompositeOperation = "source-over";
 
   ctx.drawImage(off, 0, 0);

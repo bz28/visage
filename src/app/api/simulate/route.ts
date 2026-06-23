@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
-import { SIMULATABLE, LOOK_KEYS, LOOKS, buildPrompt } from "@/lib/simulation";
+import {
+  SIMULATABLE,
+  LOOK_KEYS,
+  LOOKS,
+  buildPrompt,
+  buildCombinedPrompt,
+} from "@/lib/simulation";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -10,8 +16,11 @@ export const maxDuration = 60;
 const bodySchema = z.object({
   /** Source photo as a data URL. */
   image: z.string().min(1),
-  area: z.enum(SIMULATABLE),
-  look: z.enum(LOOK_KEYS),
+  // Patient flow: all recommended areas in one combined edit.
+  areas: z.array(z.enum(SIMULATABLE)).min(1).max(6).optional(),
+  // Clinician flow: a single area at a chosen look.
+  area: z.enum(SIMULATABLE).optional(),
+  look: z.enum(LOOK_KEYS).optional(),
   /** Observed mouth state from the client's landmarks — pins it in the prompt. */
   mouthOpen: z.boolean().optional(),
 });
@@ -31,8 +40,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const look = LOOKS.find((l) => l.key === body.look)!;
-  const prompt = buildPrompt(body.area, look.ml, look.label, body.mouthOpen);
+  // Combined (patient) path when `areas` is given; else single-area (clinician).
+  let prompt: string;
+  if (body.areas?.length) {
+    prompt = buildCombinedPrompt(body.areas, body.mouthOpen);
+  } else if (body.area) {
+    const look = LOOKS.find((l) => l.key === (body.look ?? "natural"))!;
+    prompt = buildPrompt(body.area, look.ml, look.label, body.mouthOpen);
+  } else {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
 
   // Dev mock (no key): echo the original photo so the UI flow is fully testable
   // without paying for / configuring image-gen. Never in production.
