@@ -2,31 +2,26 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Marker } from "@/lib/annotations";
-import type { Pt } from "@/lib/landmarks";
 import { AREA_LABELS } from "@/lib/assessment-schema";
-import { paintAreaRegion } from "@/lib/face-regions";
-import { isSimulatable } from "@/lib/simulation";
 
 interface Props {
   dataUrl: string;
   imageWidth: number;
   imageHeight: number;
-  /** Full landmark set — used to draw the soft region highlights. */
-  landmarks: Pt[];
-  /** One per recommended area, for the label position + which areas. */
+  /** One per area to mark — a small pin + label, drawn at each point. */
   markers: Marker[];
 }
 
 /**
- * The patient's own photo with each recommended area shown as a soft accent glow
- * over the actual region + a label — so it reads "here's your jawline" directly,
- * no number-matching. Sizes to its container with a height cap.
+ * The patient's own photo with each recommended area marked by a small pin + a
+ * label sitting just below it ("Jawline") — so it reads directly, no
+ * number-matching and nothing obscuring the face. Sizes to its container with a
+ * height cap.
  */
 export function FaceCanvas({
   dataUrl,
   imageWidth,
   imageHeight,
-  landmarks,
   markers,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -81,24 +76,9 @@ export function FaceCanvas({
         getComputedStyle(document.documentElement)
           .getPropertyValue("--accent")
           .trim() || "#b8895f";
-      const lm = landmarks.map((p) => ({ x: p.x * scale, y: p.y * scale }));
 
-      // Soft glow over each treated region. Two passes (a brighter highlight
-      // core + the accent) so it reads on any skin tone without looking garish.
       for (const m of markers) {
-        if (!isSimulatable(m.area)) continue;
-        ctx.globalAlpha = 0.4;
-        paintAreaRegion(ctx, lm, m.area, cssW, cssH, accent);
-        ctx.globalAlpha = 0.22;
-        paintAreaRegion(ctx, lm, m.area, cssW, cssH, "#fff");
-      }
-      ctx.globalAlpha = 1;
-
-      // A label pill per area, at its point. Every discussed area is labelled
-      // (so the photo matches the treatment-plan list); only simulatable areas
-      // additionally get the glow above, since those are the ones we can render.
-      for (const m of markers) {
-        drawLabel(ctx, AREA_LABELS[m.area], m.point.x * scale, m.point.y * scale);
+        drawPin(ctx, AREA_LABELS[m.area], m.point.x * scale, m.point.y * scale, accent);
       }
     }
 
@@ -110,35 +90,46 @@ export function FaceCanvas({
       ro.disconnect();
       window.removeEventListener("resize", draw);
     };
-  }, [markers, landmarks, loaded, imageWidth, imageHeight]);
+  }, [markers, loaded, imageWidth, imageHeight]);
 
   return (
     <div ref={wrapRef} className="flex justify-center">
       <canvas
         ref={canvasRef}
         className="block rounded-2xl shadow-sm"
-        aria-label="Your photo with the areas we'd explore highlighted"
+        aria-label="Your photo with the areas we'd explore marked"
       />
     </div>
   );
 }
 
-function drawLabel(
+// A small accent dot at the feature point + a label just below it.
+function drawPin(
   ctx: CanvasRenderingContext2D,
   text: string,
   x: number,
   y: number,
+  accent: string,
 ) {
+  ctx.beginPath();
+  ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+  ctx.fillStyle = accent;
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(255,255,255,0.95)";
+  ctx.stroke();
+
   ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   const padX = 9;
   const h = 21;
+  const labelY = y + 16;
   const w = ctx.measureText(text).width + padX * 2;
   ctx.fillStyle = "rgba(15,15,15,0.8)";
   ctx.beginPath();
-  ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2);
+  ctx.roundRect(x - w / 2, labelY - h / 2, w, h, h / 2);
   ctx.fill();
   ctx.fillStyle = "#fff";
-  ctx.fillText(text, x, y + 0.5);
+  ctx.fillText(text, x, labelY + 0.5);
 }

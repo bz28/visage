@@ -57,19 +57,60 @@ export function ScanFlow() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // The patient's single combined before/after — all recommended areas edited at
-  // the optimal amount, in one image. (Per-area Subtle/Natural/Fuller editing is
-  // the clinician tool, not the patient flow.)
+  // The patient's combined before/after. We generate ONE "after" with every
+  // recommended area at the optimal amount, cache the raw AI output (the one
+  // that passed the harness), and composite the regions back. Because we paste
+  // per-region, the patient can toggle which areas to include and we re-paste a
+  // subset of the SAME generation — no new API call. (Per-area Subtle/Natural/
+  // Fuller editing is the clinician tool, not the patient flow.)
   const [combinedSrc, setCombinedSrc] = useState<string | null>(null);
   const [combinedLoading, setCombinedLoading] = useState(false);
   const [combinedFailed, setCombinedFailed] = useState(false);
+  const [generatedRaw, setGeneratedRaw] = useState<string | null>(null);
+  // Areas the patient currently wants included (defaults to all recommended).
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   // Bumped on each analyze/reset so a slow background generation can't write its
   // result onto a flow the user has already moved on from (Book → Start over).
   const genId = useRef(0);
 
-  // Generate the combined "after" in one call, then composite all the treated
-  // regions back onto the original so nothing else changes. Retries if the
-  // harness rejects the generation (e.g. the mouth drifted on a lip edit).
+  // Composite the cached generation down to the currently-selected regions.
+  // Pasting a subset is a fast local canvas op — toggling never re-calls the
+  // model. `gen` guards against writing onto a flow the user has left.
+  async function recompose(
+    sel: Set<string>,
+    raw: string,
+    gen: number,
+    f: Photo,
+    lm: Pt[],
+  ) {
+    const simSel = [...sel].filter(isSimulatable);
+    if (simSel.length === 0) {
+      if (gen === genId.current) {
+        setCombinedSrc(null);
+        setCombinedLoading(false);
+      }
+      return;
+    }
+    setCombinedLoading(true);
+    try {
+      const r = await compositeAreas(
+        f.dataUrl,
+        lm,
+        simSel,
+        raw,
+        f.width,
+        f.height,
+      );
+      if (gen !== genId.current) return;
+      if (r.ok && r.dataUrl) setCombinedSrc(r.dataUrl);
+    } finally {
+      if (gen === genId.current) setCombinedLoading(false);
+    }
+  }
+
+  // Generate the combined "after" once, retrying if the harness rejects it
+  // (e.g. the mouth drifted on a lip edit). On success we cache the raw output
+  // so toggling areas can re-paste a subset without a new generation.
   async function generateCombined(
     f: Photo,
     lm: Pt[],
@@ -81,8 +122,8 @@ export function ScanFlow() {
     setCombinedLoading(true);
     try {
       const mouthOpen = isMouthOpen(lm);
-      let composited: string | null = null;
-      for (let attempt = 0; attempt < 3 && !composited; attempt++) {
+      let raw: string | null = null;
+      for (let attempt = 0; attempt < 3 && !raw; attempt++) {
         const res = await fetch("/api/simulate", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -90,6 +131,7 @@ export function ScanFlow() {
         });
         const data: { image?: string; fallback?: boolean } = await res.json();
         if (!data.image) break; // server fell back (no key / refusal / error)
+        // Composite once to run the harness; keep the raw output if it passes.
         const result = await compositeAreas(
           f.dataUrl,
           lm,
@@ -98,17 +140,33 @@ export function ScanFlow() {
           f.width,
           f.height,
         );
-        if (result.ok && result.dataUrl) composited = result.dataUrl;
+        if (result.ok) raw = data.image;
         else console.warn(`[combined] rejected, retrying: ${result.reason}`);
         if (gen !== genId.current) return; // superseded — drop the result
       }
       if (gen !== genId.current) return;
-      if (composited) setCombinedSrc(composited);
-      else setCombinedFailed(true);
+      if (raw) {
+        setGeneratedRaw(raw);
+        await recompose(new Set(areas), raw, gen, f, lm); // initial: all areas
+      } else {
+        setCombinedFailed(true);
+        setCombinedLoading(false);
+      }
     } catch {
-      if (gen === genId.current) setCombinedFailed(true);
-    } finally {
-      if (gen === genId.current) setCombinedLoading(false);
+      if (gen === genId.current) {
+        setCombinedFailed(true);
+        setCombinedLoading(false);
+      }
+    }
+  }
+
+  function toggleArea(area: string) {
+    const next = new Set(selected);
+    if (next.has(area)) next.delete(area);
+    else next.add(area);
+    setSelected(next);
+    if (front && analysis && generatedRaw) {
+      void recompose(next, generatedRaw, genId.current, front, analysis.landmarks);
     }
   }
 
@@ -174,6 +232,10 @@ export function ScanFlow() {
 
       const { markers } = buildAnnotations(assessment.areas, landmarks);
       setAnalysis({ assessment, markers, landmarks });
+      // Start with every recommended area selected (the full plan).
+      setSelected(new Set(assessment.areas.map((a) => a.area)));
+      setGeneratedRaw(null);
+      setCombinedSrc(null);
       setStep("result");
 
       // Kick off the combined before/after in the background so it's rendering
@@ -203,6 +265,8 @@ export function ScanFlow() {
     setCombinedSrc(null);
     setCombinedFailed(false);
     setCombinedLoading(false);
+    setGeneratedRaw(null);
+    setSelected(new Set());
     setStep("intake");
   }
 
@@ -279,8 +343,7 @@ export function ScanFlow() {
                   dataUrl={front.dataUrl}
                   imageWidth={front.width}
                   imageHeight={front.height}
-                  landmarks={analysis.landmarks}
-                  markers={analysis.markers}
+                  markers={analysis.markers.filter((m) => selected.has(m.area))}
                 />
                 <figcaption className="text-center text-xs font-medium uppercase tracking-wide text-neutral-400">
                   Now
@@ -306,7 +369,9 @@ export function ScanFlow() {
                     <span className="px-3 text-center text-xs text-neutral-400">
                       {combinedFailed
                         ? "Preview unavailable — your read still stands."
-                        : "Preview"}
+                        : ![...selected].some(isSimulatable)
+                          ? "Select an area below to preview it."
+                          : "Preview"}
                     </span>
                   )}
                   {combinedSrc && (
@@ -323,6 +388,8 @@ export function ScanFlow() {
 
             <AssessmentResult
               assessment={analysis.assessment}
+              selected={selected}
+              onToggle={toggleArea}
               onBook={() => setStep("book")}
             />
           </div>

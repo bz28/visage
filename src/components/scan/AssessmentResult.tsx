@@ -6,15 +6,25 @@ import { CLINIC } from "@/lib/clinic";
 
 interface Props {
   assessment: Assessment;
+  /** Areas currently included in the preview. */
+  selected: Set<string>;
+  /** Toggle an area in/out of the preview. */
+  onToggle: (area: string) => void;
   onBook: () => void;
 }
 
 /**
  * The patient result is deliberately simple (surgeon's direction): a short
- * treatment-plan checklist (the photo already labels each area), then the
- * booking CTA. The detailed per-area editing lives in the future clinician tool.
+ * treatment-plan checklist, then the booking CTA. Each area is a toggle — tap to
+ * include/remove it from the before/after (we re-paste a subset of the same
+ * generation, no new render). Per-area amount editing is the clinician tool.
  */
-export function AssessmentResult({ assessment, onBook }: Props) {
+export function AssessmentResult({
+  assessment,
+  selected,
+  onToggle,
+  onBook,
+}: Props) {
   const uniqueAreas = assessment.areas.filter(
     (a, i) => assessment.areas.findIndex((b) => b.area === a.area) === i,
   );
@@ -23,28 +33,50 @@ export function AssessmentResult({ assessment, onBook }: Props) {
     <div className="flex flex-col gap-5">
       {uniqueAreas.length > 0 ? (
         <>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-400">
-            Your treatment plan
-          </p>
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-400">
+              Your treatment plan
+            </p>
+            {uniqueAreas.length > 1 && (
+              <p className="text-xs text-neutral-400">Tap an area to compare</p>
+            )}
+          </div>
           <ul className="flex flex-col gap-3">
-            {uniqueAreas.map((a) => (
-              <li
-                key={a.area}
-                className="flex gap-3 rounded-2xl border border-border bg-surface p-4"
-              >
-                <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white">
-                  <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4L19 7" />
-                  </svg>
-                </span>
-                <div>
-                  <p className="font-medium">{AREA_LABELS[a.area]}</p>
-                  <p className="mt-0.5 text-sm leading-relaxed text-neutral-500">
-                    {a.why}
-                  </p>
-                </div>
-              </li>
-            ))}
+            {uniqueAreas.map((a) => {
+              const on = selected.has(a.area);
+              return (
+                <li key={a.area}>
+                  <button
+                    type="button"
+                    onClick={() => onToggle(a.area)}
+                    aria-pressed={on}
+                    className={`flex w-full gap-3 rounded-2xl border p-4 text-left transition-colors ${
+                      on
+                        ? "border-border bg-surface"
+                        : "border-dashed border-neutral-300 bg-transparent"
+                    }`}
+                  >
+                    <span
+                      className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full transition-colors ${
+                        on
+                          ? "bg-[var(--accent)] text-white"
+                          : "border border-neutral-300 text-transparent"
+                      }`}
+                    >
+                      <svg viewBox="0 0 24 24" className="size-3" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m5 13 4 4L19 7" />
+                      </svg>
+                    </span>
+                    <div className={on ? "" : "opacity-55"}>
+                      <p className="font-medium">{AREA_LABELS[a.area]}</p>
+                      <p className="mt-0.5 text-sm leading-relaxed text-neutral-500">
+                        {a.why}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </>
       ) : (
