@@ -292,7 +292,7 @@ export function ScanFlow() {
             )}
             <Capture
               initialPhotos={photos}
-              goals={intake?.goals ?? []}
+              concern={intake?.concern}
               onDone={analyze}
             />
           </div>

@@ -27,6 +27,7 @@ How to reason like a clinician:
 - Judge PROJECTION (chin, lips, cheek, nose — how far things sit forward) from the SIDE/profile view. If no profile was provided, you CANNOT judge projection reliably — keep those areas low/medium confidence and say it's best confirmed in profile.
 - Judge cheek/midface VOLUME and contour from the ¾ angle.
 - Tailor to the person: a strong, wider jaw and chin suit a more masculine look; softer, fuller lips and lifted cheeks suit a more feminine look. Respect their stated goal and prioritize what serves it. Honor and PRESERVE their heritage and identity — never push one universal ideal.
+- The patient's free-text says what bothers THEM, in lay terms (e.g. "I look tired"). Honor it and lead with it, but still surface every relevant area you'd genuinely discuss — don't limit yourself to only what they named.
 - Subtlety over drama: people fear looking "overdone" far more than they fear doing nothing. Favor natural, restrained enhancement that looks like the best version of THEM — never a different face. Frame everything as balance and harmony worth exploring, never as a flaw to fix.
 - Confidence reflects what you actually had: fewer views, a tilted front photo, or thin signal → lower confidence.
 
@@ -53,12 +54,14 @@ function describe(m: Measurements, intake: Intake | undefined, views: ViewKey[])
   ];
   if (intake) {
     const bits: string[] = [];
-    if (intake.goals?.length) bits.push(`goals: ${intake.goals.join(", ")}`);
-    if (intake.look) bits.push(`look: ${LOOK_LABELS[intake.look]}`);
+    if (intake.gender) bits.push(`gender: ${intake.gender}`);
+    if (intake.look) bits.push(`aesthetic direction: ${LOOK_LABELS[intake.look]}`);
     if (intake.age) bits.push(`age: ${intake.age}`);
+    // Free-text is their stated concern — honor it, but still suggest every
+    // relevant area, not only what they named.
+    if (intake.concern) bits.push(`in their words: "${intake.concern}"`);
     if (intake.heritage) bits.push(`heritage: ${intake.heritage}`);
     if (intake.priorTreatments) bits.push(`prior: ${intake.priorTreatments}`);
-    if (intake.budget) bits.push(`budget: ${intake.budget}`);
     if (bits.length) lines.push(`Patient intake — ${bits.join("; ")}.`);
   }
   return lines.join("\n");

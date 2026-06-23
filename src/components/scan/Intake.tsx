@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import {
-  GOAL_OPTIONS,
-  LOOK_OPTIONS,
-  LOOK_LABELS,
+  GENDER_OPTIONS,
+  GENDER_LABELS,
   AGE_OPTIONS,
-  BUDGET_OPTIONS,
+  lookFromGender,
+  type Gender,
   type Intake as IntakeData,
 } from "@/lib/intake-schema";
 
@@ -38,100 +38,66 @@ function Chip({
   );
 }
 
+/**
+ * Minimal patient intake (surgeon's direction): gender, age, and one free-text
+ * box. That's enough to personalize the read — we don't make them pick areas or
+ * fill a form. The AI suggests every relevant area regardless of what they type.
+ */
 export function Intake({ onSubmit }: Props) {
-  const [goals, setGoals] = useState<string[]>([]);
-  const [look, setLook] = useState<IntakeData["look"]>();
+  const [gender, setGender] = useState<Gender>();
   const [age, setAge] = useState<IntakeData["age"]>();
-  const [budget, setBudget] = useState<IntakeData["budget"]>();
-  const [heritage, setHeritage] = useState("");
-  const [priorTreatments, setPriorTreatments] = useState("");
-
-  const toggleGoal = (g: string) =>
-    setGoals((prev) =>
-      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g],
-    );
+  const [concern, setConcern] = useState("");
 
   const submit = () =>
     onSubmit({
-      goals,
-      look,
+      gender,
       age,
-      budget,
-      heritage: heritage.trim() || undefined,
-      priorTreatments: priorTreatments.trim() || undefined,
+      concern: concern.trim() || undefined,
+      // Derive the aesthetic direction the read reasons with from gender.
+      look: lookFromGender(gender),
+      goals: [],
     });
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-6 rounded-3xl border border-border bg-surface p-6 shadow-sm sm:p-8">
-      <div>
-        <h2 className="font-display text-xl font-semibold">
-          A few quick questions
-        </h2>
-        <p className="mt-1 text-sm text-neutral-500">
-          So your read fits you — not a generic ideal. Every field is optional.
-        </p>
-      </div>
-
-      <Field label="What would you love to improve?">
-        <div className="flex flex-wrap gap-2">
-          {GOAL_OPTIONS.map((g) => (
-            <Chip key={g} active={goals.includes(g)} onClick={() => toggleGoal(g)}>
-              {g}
-            </Chip>
-          ))}
+        <div>
+          <h2 className="font-display text-xl font-semibold">A couple of quick things</h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            Just enough to make your read personal. All optional.
+          </p>
         </div>
-      </Field>
 
-      <Field label="The look you're going for">
-        <div className="flex flex-wrap gap-2">
-          {LOOK_OPTIONS.map((l) => (
-            <Chip key={l} active={look === l} onClick={() => setLook(look === l ? undefined : l)}>
-              {LOOK_LABELS[l]}
-            </Chip>
-          ))}
-        </div>
-      </Field>
+        <Field label="You are…">
+          <div className="flex flex-wrap gap-2">
+            {GENDER_OPTIONS.map((g) => (
+              <Chip key={g} active={gender === g} onClick={() => setGender(gender === g ? undefined : g)}>
+                {GENDER_LABELS[g]}
+              </Chip>
+            ))}
+          </div>
+        </Field>
 
-      <Field label="Age">
-        <div className="flex flex-wrap gap-2">
-          {AGE_OPTIONS.map((a) => (
-            <Chip key={a} active={age === a} onClick={() => setAge(age === a ? undefined : a)}>
-              {a}
-            </Chip>
-          ))}
-        </div>
-      </Field>
+        <Field label="Age">
+          <div className="flex flex-wrap gap-2">
+            {AGE_OPTIONS.map((a) => (
+              <Chip key={a} active={age === a} onClick={() => setAge(age === a ? undefined : a)}>
+                {a}
+              </Chip>
+            ))}
+          </div>
+        </Field>
 
-      <Field label="Where are you in your thinking?">
-        <div className="flex flex-wrap gap-2">
-          {BUDGET_OPTIONS.map((b) => (
-            <Chip key={b} active={budget === b} onClick={() => setBudget(budget === b ? undefined : b)}>
-              {b}
-            </Chip>
-          ))}
-        </div>
-      </Field>
-
-      <Field label="Heritage / background (optional)">
-        <input
-          value={heritage}
-          maxLength={60}
-          onChange={(e) => setHeritage(e.target.value)}
-          placeholder="Helps us tailor to your features"
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm transition-colors focus:border-[var(--accent)] focus:outline-none"
-        />
-      </Field>
-
-      <Field label="Any past filler or tox? (optional)">
-        <input
-          value={priorTreatments}
-          maxLength={300}
-          onChange={(e) => setPriorTreatments(e.target.value)}
-          placeholder="e.g. lip filler last year"
-          className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm transition-colors focus:border-[var(--accent)] focus:outline-none"
-        />
-      </Field>
+        <Field label="What would you like to improve?">
+          <textarea
+            value={concern}
+            maxLength={300}
+            onChange={(e) => setConcern(e.target.value)}
+            rows={3}
+            placeholder="In your words — e.g. “I look tired,” “fuller lips,” “a sharper jaw.”"
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm leading-relaxed transition-colors focus:border-[var(--accent)] focus:outline-none"
+          />
+        </Field>
       </div>
 
       <div className="flex flex-col gap-3">
