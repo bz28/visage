@@ -13,11 +13,21 @@ export interface CapturedImage {
 interface Props {
   /** Restore previously-captured photos (e.g. after a detection error). */
   initialPhotos?: Partial<Record<ViewKey, string>>;
+  /** Patient's stated goals — drives the side-photo recommendation. */
+  goals?: string[];
   onDone: (images: CapturedImage[]) => void;
 }
 
+// Goals whose treatment is about PROJECTION (how far the feature sits forward),
+// which genuinely can't be judged from a front photo and wants a profile/side
+// shot. CLINICAL assumption — flagged for surgeon review (docs).
+const PROFILE_GOALS: Record<string, string> = {
+  "Sharper jawline": "jawline",
+  "More defined chin": "chin",
+};
+
 // Front is required; side & angle are optional but make the read more accurate.
-export function Capture({ initialPhotos, onDone }: Props) {
+export function Capture({ initialPhotos, goals = [], onDone }: Props) {
   const [photos, setPhotos] =
     useState<Partial<Record<ViewKey, string>>>(initialPhotos ?? {});
   // Start at the review screen if we already have a front photo; else capture it.
@@ -49,6 +59,13 @@ export function Capture({ initialPhotos, onDone }: Props) {
     onDone(images);
   }
 
+  // If their goals are projection-based (jaw/chin), recommend a side photo —
+  // but only while they haven't added one. Encouraged, never required.
+  const profileAreas = [
+    ...new Set(goals.map((g) => PROFILE_GOALS[g]).filter(Boolean)),
+  ];
+  const recommendProfile = profileAreas.length > 0 && !photos.profile;
+
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -62,10 +79,15 @@ export function Capture({ initialPhotos, onDone }: Props) {
       <div className="flex flex-col gap-3">
         {VIEWS.map((v) => {
           const url = photos[v.key];
+          const recommended = v.key === "profile" && recommendProfile;
           return (
             <div
               key={v.key}
-              className="flex items-center gap-3 rounded-xl border border-neutral-200 p-3"
+              className={`flex items-center gap-3 rounded-xl border p-3 ${
+                recommended
+                  ? "border-[var(--accent)]/50 bg-[var(--accent)]/5"
+                  : "border-neutral-200"
+              }`}
             >
               <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-100">
                 {url ? (
@@ -82,14 +104,22 @@ export function Capture({ initialPhotos, onDone }: Props) {
               <div className="min-w-0 flex-1">
                 <div className="font-medium">
                   {v.label}
-                  {!v.required && (
-                    <span className="ml-2 text-xs text-neutral-400">
-                      optional
+                  {recommended ? (
+                    <span className="ml-2 rounded-full bg-[var(--accent)]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--accent)]">
+                      Recommended
                     </span>
+                  ) : (
+                    !v.required && (
+                      <span className="ml-2 text-xs text-neutral-400">
+                        optional
+                      </span>
+                    )
                   )}
                 </div>
                 <p className="truncate text-xs text-neutral-400">
-                  {v.instruction}
+                  {recommended
+                    ? `A side photo reads your ${profileAreas.join(" and ")} much surer.`
+                    : v.instruction}
                 </p>
               </div>
               <button
