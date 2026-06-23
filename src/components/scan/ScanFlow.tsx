@@ -1,12 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { detectFace, type Pt } from "@/lib/landmarks";
 import { computeMeasurements } from "@/lib/measurements";
 import { baselineAssessment } from "@/lib/baseline";
 import { buildAnnotations, type Marker } from "@/lib/annotations";
-import { compositeArea, isMouthOpen } from "@/lib/composite";
-import type { LookKey, SimulatableArea } from "@/lib/simulation";
+import { compositeAreas, isMouthOpen } from "@/lib/composite";
+import { isSimulatable, type SimulatableArea } from "@/lib/simulation";
 import type { Assessment } from "@/lib/assessment-schema";
 import type { Intake as IntakeData } from "@/lib/intake-schema";
 import type { ViewKey } from "@/lib/views";
@@ -39,11 +39,6 @@ interface Analysis {
   markers: Marker[];
   numberByArea: Record<string, number>;
 }
-interface Preview {
-  area: SimulatableArea;
-  look: LookKey;
-  src: string;
-}
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -59,104 +54,51 @@ export function ScanFlow() {
   const [intake, setIntake] = useState<IntakeData | null>(null);
   const [photos, setPhotos] = useState<Partial<Record<ViewKey, string>>>({});
   const [front, setFront] = useState<Photo | null>(null);
-  const [landmarks, setLandmarks] = useState<Pt[] | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
-  const [active, setActive] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Before/after preview state. `preview` is the after image currently shown;
-  // generated images are cached by `${area}:${look}` so flipping back is instant.
-  const [preview, setPreview] = useState<Preview | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewFailed, setPreviewFailed] = useState(false);
-  const previewCache = useRef<Record<string, string>>({});
-  // The look last shown for each area, so navigating back to an area restores
-  // its preview instead of dropping to the bare photo.
-  const lastLookByArea = useRef<Partial<Record<SimulatableArea, LookKey>>>({});
-  // Drops stale responses when the user switches area / look mid-generation.
-  const previewReqId = useRef(0);
+  // The patient's single combined before/after — all recommended areas edited at
+  // the optimal amount, in one image. (Per-area Subtle/Natural/Fuller editing is
+  // the clinician tool, not the patient flow.)
+  const [combinedSrc, setCombinedSrc] = useState<string | null>(null);
+  const [combinedLoading, setCombinedLoading] = useState(false);
+  const [combinedFailed, setCombinedFailed] = useState(false);
 
-  async function requestPreview(area: SimulatableArea, look: LookKey) {
-    if (!landmarks || !front) return;
-    const reqId = ++previewReqId.current;
-    const key = `${area}:${look}`;
-    const cached = previewCache.current[key];
-    if (cached) {
-      lastLookByArea.current[area] = look;
-      setPreviewFailed(false);
-      setPreviewLoading(false);
-      setPreview({ area, look, src: cached });
-      return;
-    }
-    setPreviewFailed(false);
-    setPreviewLoading(true);
+  // Generate the combined "after" in one call, then composite all the treated
+  // regions back onto the original so nothing else changes. Retries if the
+  // harness rejects the generation (e.g. the mouth drifted on a lip edit).
+  async function generateCombined(f: Photo, lm: Pt[], areas: SimulatableArea[]) {
+    if (areas.length === 0) return;
+    setCombinedFailed(false);
+    setCombinedLoading(true);
     try {
-      // Generate, then composite the treated region back onto the original so
-      // everything else is locked. If the harness rejects it (e.g. the mouth
-      // drifted), retry with a fresh generation — Gemini is stochastic.
-      // Tell the model the actual mouth state so it pins it (closed stays
-      // closed) — fewer harness rejections, more faithful output.
-      const mouthOpen = isMouthOpen(landmarks);
+      const mouthOpen = isMouthOpen(lm);
       let composited: string | null = null;
       for (let attempt = 0; attempt < 3 && !composited; attempt++) {
         const res = await fetch("/api/simulate", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ image: front.dataUrl, area, look, mouthOpen }),
+          body: JSON.stringify({ image: f.dataUrl, areas, mouthOpen }),
         });
         const data: { image?: string; fallback?: boolean } = await res.json();
         if (!data.image) break; // server fell back (no key / refusal / error)
-
-        const result = await compositeArea(
-          front.dataUrl,
-          landmarks,
-          area,
+        const result = await compositeAreas(
+          f.dataUrl,
+          lm,
+          areas,
           data.image,
-          front.width,
-          front.height,
+          f.width,
+          f.height,
         );
         if (result.ok && result.dataUrl) composited = result.dataUrl;
-        else console.warn(`[preview] rejected, retrying: ${result.reason}`);
-        // Stop burning paid generations for an area the user has navigated away
-        // from — but we still keep any good result from this attempt below.
-        if (reqId !== previewReqId.current) break;
+        else console.warn(`[combined] rejected, retrying: ${result.reason}`);
       }
-
-      // Cache regardless of whether this is still the active request — the API
-      // call was already paid for, so navigating back should reuse it (instant),
-      // not re-generate.
-      if (composited) {
-        previewCache.current[key] = composited;
-        lastLookByArea.current[area] = look;
-      }
-
-      // Only touch the UI if this request is still the current one.
-      if (reqId !== previewReqId.current) return;
-      if (composited) setPreview({ area, look, src: composited });
-      else setPreviewFailed(true);
+      if (composited) setCombinedSrc(composited);
+      else setCombinedFailed(true);
     } catch {
-      if (reqId === previewReqId.current) setPreviewFailed(true);
+      setCombinedFailed(true);
     } finally {
-      if (reqId === previewReqId.current) setPreviewLoading(false);
-    }
-  }
-
-  // Switching the active area restores that area's last preview if we have one
-  // cached, so a generated look isn't lost when navigating away and back.
-  function selectActive(area: string | null) {
-    setActive(area);
-    if (area === preview?.area) return;
-    previewReqId.current++; // invalidate any in-flight generation
-    setPreviewLoading(false);
-    setPreviewFailed(false);
-
-    const simArea = area as SimulatableArea | null;
-    const lastLook = simArea ? lastLookByArea.current[simArea] : undefined;
-    const cached = simArea && lastLook ? previewCache.current[`${simArea}:${lastLook}`] : undefined;
-    if (simArea && lastLook && cached) {
-      setPreview({ area: simArea, look: lastLook, src: cached });
-    } else {
-      setPreview(null);
+      setCombinedLoading(false);
     }
   }
 
@@ -195,7 +137,6 @@ export function ScanFlow() {
       }
 
       const landmarks = result.landmarks;
-      setLandmarks(landmarks);
       const measurements = computeMeasurements(landmarks);
       const baseline = baselineAssessment(measurements, intake ?? undefined);
 
@@ -227,6 +168,17 @@ export function ScanFlow() {
       );
       setAnalysis({ assessment, markers, numberByArea });
       setStep("result");
+
+      // Kick off the combined before/after in the background so it's rendering
+      // while they read the plan.
+      const simAreas = [
+        ...new Set(assessment.areas.map((a) => a.area)),
+      ].filter(isSimulatable);
+      void generateCombined(
+        { dataUrl: frontImg.dataUrl, width: w, height: h },
+        landmarks,
+        simAreas,
+      );
     } catch {
       setError("Something went wrong reading that photo. Please try again.");
       setStep("capture");
@@ -237,14 +189,11 @@ export function ScanFlow() {
     setIntake(null);
     setPhotos({});
     setFront(null);
-    setLandmarks(null);
     setAnalysis(null);
-    setActive(null);
     setError(null);
-    setPreview(null);
-    setPreviewFailed(false);
-    previewCache.current = {};
-    lastLookByArea.current = {};
+    setCombinedSrc(null);
+    setCombinedFailed(false);
+    setCombinedLoading(false);
     setStep("intake");
   }
 
@@ -314,46 +263,65 @@ export function ScanFlow() {
               </p>
             </header>
 
-            <div className="flex flex-col gap-7 md:flex-row md:items-start md:gap-10">
-              <div className="md:sticky md:top-6 md:w-[52%] md:shrink-0">
+            {/* Side-by-side before / after — the combined optimal result. */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <figure className="flex flex-col gap-2">
                 <FaceCanvas
                   dataUrl={front.dataUrl}
                   imageWidth={front.width}
                   imageHeight={front.height}
                   markers={analysis.markers}
-                  active={active}
-                  onSelectArea={selectActive}
-                  previewSrc={preview?.src ?? null}
-                  previewLoading={previewLoading}
                 />
-              </div>
-              <div className="md:flex-1">
-                <AssessmentResult
-                  assessment={analysis.assessment}
-                  numberByArea={analysis.numberByArea}
-                  active={active}
-                  onSetActive={selectActive}
-                  onBook={() => setStep("book")}
-                  canPreview={!!landmarks}
-                  previewLook={preview?.look ?? null}
-                  previewArea={preview?.area ?? null}
-                  previewLoading={previewLoading}
-                  previewFailed={previewFailed}
-                  onPreview={requestPreview}
-                />
-              </div>
+                <figcaption className="text-center text-xs font-medium uppercase tracking-wide text-neutral-400">
+                  Now
+                </figcaption>
+              </figure>
+              <figure className="flex flex-col gap-2">
+                <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl bg-neutral-100 shadow-sm">
+                  {combinedSrc ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={combinedSrc}
+                      alt="Simulated result with the recommended treatment"
+                      className="size-full object-cover"
+                    />
+                  ) : combinedLoading ? (
+                    <div className="flex flex-col items-center gap-2 text-center">
+                      <span className="size-5 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+                      <span className="px-3 text-xs text-neutral-500">
+                        Creating your preview…
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="px-3 text-center text-xs text-neutral-400">
+                      {combinedFailed
+                        ? "Preview unavailable — your read still stands."
+                        : "Preview"}
+                    </span>
+                  )}
+                  {combinedSrc && (
+                    <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      Simulated
+                    </span>
+                  )}
+                </div>
+                <figcaption className="text-center text-xs font-medium uppercase tracking-wide text-[var(--accent)]">
+                  With treatment
+                </figcaption>
+              </figure>
             </div>
+
+            <AssessmentResult
+              assessment={analysis.assessment}
+              numberByArea={analysis.numberByArea}
+              onBook={() => setStep("book")}
+            />
           </div>
         )}
 
         {step === "book" && analysis && (
           <BookConsult
             interests={[...new Set(analysis.assessment.areas.map((a) => a.area))]}
-            previewedLook={
-              preview
-                ? { area: preview.area, look: preview.look }
-                : undefined
-            }
             onDone={reset}
           />
         )}

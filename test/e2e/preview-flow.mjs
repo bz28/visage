@@ -148,23 +148,24 @@ async function main() {
       );
     }
 
-    // Tap the first area chip, then request its preview.
-    const areaChip = page.locator('button:has-text("Lips"), button:has-text("Chin"), button:has-text("Cheeks"), button:has-text("Jawline")').first();
-    await areaChip.click();
-    await page.getByRole("button", { name: /See your .* preview/i }).click();
+    // The treatment plan + combined before/after render automatically.
+    await page.getByText(/treatment plan/i).waitFor({ timeout: 30_000 });
 
-    log("waiting for the preview to render…");
-    await page.getByText("Simulated preview").waitFor({ timeout: 60_000 });
+    log("waiting for the combined before/after to render…");
+    // The "With treatment" image generates in the background; wait for it.
+    await page
+      .locator('img[alt*="Simulated result"]')
+      .waitFor({ timeout: 60_000 });
 
-    // Assert the preview image actually decoded (non-zero dimensions).
+    // Assert it actually decoded (non-zero dimensions).
     const dims = await page.evaluate(() => {
-      const img = document.querySelector('img[alt=""]');
+      const img = document.querySelector('img[alt*="Simulated result"]');
       return img ? { w: img.naturalWidth, h: img.naturalHeight } : null;
     });
     if (!dims || dims.w === 0 || dims.h === 0) {
-      fail(`preview image did not render (dims=${JSON.stringify(dims)})`);
+      fail(`combined preview did not render (dims=${JSON.stringify(dims)})`);
     }
-    log(`preview rendered (${dims.w}×${dims.h}).`);
+    log(`combined before/after rendered (${dims.w}×${dims.h}).`);
 
     if (consoleErrors.length) {
       fail(`console errors:\n  - ${consoleErrors.join("\n  - ")}`);
