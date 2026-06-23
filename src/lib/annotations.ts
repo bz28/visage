@@ -1,5 +1,5 @@
-// Maps assessment areas to numbered markers on the user's own photo (never a
-// fabricated "after"). The number ties each dot to its list item in the UI.
+// Maps assessment areas to label points on the user's own photo (never a
+// fabricated "after"). FaceCanvas draws a pin + label at each point.
 import { KEY, REGIONS, type Pt } from "./landmarks";
 import type { AssessmentArea } from "./assessment-schema";
 
@@ -7,8 +7,6 @@ export interface Marker {
   area: AssessmentArea["area"];
   /** Pixel position in source-image coordinates. */
   point: Pt;
-  /** 1-based number shown in the dot and on the matching list item. */
-  n: number;
 }
 
 const centroid = (lm: Pt[], idx: readonly number[]): Pt => {
@@ -46,21 +44,19 @@ function pointFor(area: AssessmentArea["area"], lm: Pt[]): Pt {
 }
 
 /**
- * Build markers + an area→number map from an assessment. Areas are numbered in
- * list order; duplicates of an area share one marker/number (so two "chin"
- * items both point at dot 2).
+ * Build one marker per unique area from an assessment (duplicates of an area
+ * collapse to a single marker).
  */
 export function buildAnnotations(
   areas: AssessmentArea[],
   lm: Pt[],
-): { markers: Marker[]; numberByArea: Record<string, number> } {
-  const numberByArea: Record<string, number> = {};
+): { markers: Marker[] } {
+  const seen = new Set<string>();
   const markers: Marker[] = [];
   for (const a of areas) {
-    if (numberByArea[a.area] != null) continue;
-    const n = markers.length + 1;
-    numberByArea[a.area] = n;
-    markers.push({ area: a.area, point: pointFor(a.area, lm), n });
+    if (seen.has(a.area)) continue;
+    seen.add(a.area);
+    markers.push({ area: a.area, point: pointFor(a.area, lm) });
   }
-  return { markers, numberByArea };
+  return { markers };
 }
