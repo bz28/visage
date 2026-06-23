@@ -1,5 +1,5 @@
 // Maps assessment areas to label points on the user's own photo (never a
-// fabricated "after"). FaceCanvas draws each area's region glow + label here.
+// fabricated "after"). FaceCanvas draws a pin + label at each point.
 import { KEY, REGIONS, type Pt } from "./landmarks";
 import type { AssessmentArea } from "./assessment-schema";
 

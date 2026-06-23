@@ -68,24 +68,32 @@ export function ScanFlow() {
   const [combinedFailed, setCombinedFailed] = useState(false);
   const [generatedRaw, setGeneratedRaw] = useState<string | null>(null);
   // Areas the patient currently wants included (defaults to all recommended).
+  // A ref mirrors it so async paths (a slow generation completing) read the
+  // CURRENT selection, not the value captured when they started.
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const selectedRef = useRef<Set<string>>(new Set());
   // Bumped on each analyze/reset so a slow background generation can't write its
   // result onto a flow the user has already moved on from (Book → Start over).
   const genId = useRef(0);
+  // Bumped on each recompose so that when toggles overlap, only the latest one
+  // writes the image (composites can resolve out of order).
+  const recomposeId = useRef(0);
+
+  function applySelection(next: Set<string>) {
+    selectedRef.current = next;
+    setSelected(next);
+  }
 
   // Composite the cached generation down to the currently-selected regions.
   // Pasting a subset is a fast local canvas op — toggling never re-calls the
-  // model. `gen` guards against writing onto a flow the user has left.
-  async function recompose(
-    sel: Set<string>,
-    raw: string,
-    gen: number,
-    f: Photo,
-    lm: Pt[],
-  ) {
+  // model. `gen` guards against a flow the user has left; `req` against an
+  // overlapping later recompose.
+  async function recompose(sel: Set<string>, raw: string, gen: number, f: Photo, lm: Pt[]) {
+    const req = ++recomposeId.current;
+    const live = () => gen === genId.current && req === recomposeId.current;
     const simSel = [...sel].filter(isSimulatable);
     if (simSel.length === 0) {
-      if (gen === genId.current) {
+      if (live()) {
         setCombinedSrc(null);
         setCombinedLoading(false);
       }
@@ -93,18 +101,11 @@ export function ScanFlow() {
     }
     setCombinedLoading(true);
     try {
-      const r = await compositeAreas(
-        f.dataUrl,
-        lm,
-        simSel,
-        raw,
-        f.width,
-        f.height,
-      );
-      if (gen !== genId.current) return;
+      const r = await compositeAreas(f.dataUrl, lm, simSel, raw, f.width, f.height);
+      if (!live()) return; // superseded by a newer recompose / flow
       if (r.ok && r.dataUrl) setCombinedSrc(r.dataUrl);
     } finally {
-      if (gen === genId.current) setCombinedLoading(false);
+      if (live()) setCombinedLoading(false);
     }
   }
 
@@ -147,7 +148,9 @@ export function ScanFlow() {
       if (gen !== genId.current) return;
       if (raw) {
         setGeneratedRaw(raw);
-        await recompose(new Set(areas), raw, gen, f, lm); // initial: all areas
+        // Composite for the CURRENT selection (the user may have toggled while
+        // the generation was running), not just the areas we generated.
+        await recompose(selectedRef.current, raw, gen, f, lm);
       } else {
         setCombinedFailed(true);
         setCombinedLoading(false);
@@ -161,10 +164,10 @@ export function ScanFlow() {
   }
 
   function toggleArea(area: string) {
-    const next = new Set(selected);
+    const next = new Set(selectedRef.current);
     if (next.has(area)) next.delete(area);
     else next.add(area);
-    setSelected(next);
+    applySelection(next);
     if (front && analysis && generatedRaw) {
       void recompose(next, generatedRaw, genId.current, front, analysis.landmarks);
     }
@@ -233,7 +236,7 @@ export function ScanFlow() {
       const { markers } = buildAnnotations(assessment.areas, landmarks);
       setAnalysis({ assessment, markers, landmarks });
       // Start with every recommended area selected (the full plan).
-      setSelected(new Set(assessment.areas.map((a) => a.area)));
+      applySelection(new Set(assessment.areas.map((a) => a.area)));
       setGeneratedRaw(null);
       setCombinedSrc(null);
       setStep("result");
@@ -266,7 +269,7 @@ export function ScanFlow() {
     setCombinedFailed(false);
     setCombinedLoading(false);
     setGeneratedRaw(null);
-    setSelected(new Set());
+    applySelection(new Set());
     setStep("intake");
   }
 
