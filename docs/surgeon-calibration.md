@@ -115,6 +115,42 @@ Confidence: 🔴 we're guessing · 🟡 textbook default, want confirmation · �
 
 ---
 
+## C. Capture-time decisions
+
+We now check the photo on-device at capture and guide the patient before paying
+for the read. Two of those rules are clinical, not just technical:
+
+**20. 🔴 At what head-turn does a front photo stop giving a reliable read?**
+We warn (and suggest a straighter retake) when our geometric yaw estimate exceeds
+**0.18** (0 = perfectly straight-on). Too strict and we nag good photos; too loose
+and we read tilted faces wrong.
+→ *Change:* `TILT_MAX` in `photo-check.ts`.
+
+**21. 🟡 Which goals genuinely need a profile photo to read well?**
+We recommend a side photo when the goal is **jawline** or **chin** (projection,
+which a front photo can't judge). Should **lips** or **cheeks** also benefit
+enough to recommend one?
+→ *Change:* `PROFILE_GOALS` in `Capture.tsx`.
+
+## D. Exact verdict cut-offs (the numbers that flip "balanced" → "off")
+
+The doc above asks about the *targets* (thirds ≈ 33%, lip ≈ 1.6, jaw ≈ 0.70–0.75).
+These are the exact lines where we currently flip a feature to a flag — please
+sanity-check them:
+
+**22. 🟡 Are these cut-offs right?**
+- Lower third: `< 0.30` short · `> 0.36` long
+- Lip ratio (lower:upper): `< 1.3` thin · `> 2.0` bottom-heavy
+- Jaw-to-cheek width: `< 0.68` narrow · `> 0.80` wide
+- Asymmetry index: `> 0.08` worth noting
+→ *Change:* the thresholds in `measurements.ts` + `baseline.ts`.
+
+**23. 🟡 Are the 3 preview amounts realistic?** Subtle ≈ 0.5 ml · Natural ≈ 1.0 ml
+· Fuller ≈ 1.5 ml (currently the same for every area).
+→ *Change:* `LOOKS` in `simulation.ts` (also see Q1 for per-area amounts).
+
+---
+
 ## How we'll use the answers
 - **A** → calibration constants for the warp (documented in code), inpaint prompt/strength tuning, and whether chin/cheeks need a profile photo.
 - **B** → concrete edits to the `ai.ts` system prompt, `baseline.ts` rules, `measurements.ts` targets, and the area list.
