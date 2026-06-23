@@ -24,7 +24,7 @@ interface Props {
 // review (docs).
 const PROFILE_KEYWORDS: { re: RegExp; area: string }[] = [
   { re: /\b(jaw|jawline|jowl)/i, area: "jawline" },
-  { re: /\bchin/i, area: "chin" },
+  { re: /\bchins?\b/i, area: "chin" }, // \b both sides so "chinese" doesn't trip it
 ];
 
 // Front is required; side & angle are optional but make the read more accurate.
