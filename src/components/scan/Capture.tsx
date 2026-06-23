@@ -13,21 +13,22 @@ export interface CapturedImage {
 interface Props {
   /** Restore previously-captured photos (e.g. after a detection error). */
   initialPhotos?: Partial<Record<ViewKey, string>>;
-  /** Patient's stated goals — drives the side-photo recommendation. */
-  goals?: string[];
+  /** Patient's free-text concern — drives the side-photo recommendation. */
+  concern?: string;
   onDone: (images: CapturedImage[]) => void;
 }
 
-// Goals whose treatment is about PROJECTION (how far the feature sits forward),
-// which genuinely can't be judged from a front photo and wants a profile/side
-// shot. CLINICAL assumption — flagged for surgeon review (docs).
-const PROFILE_GOALS: Record<string, string> = {
-  "Sharper jawline": "jawline",
-  "More defined chin": "chin",
-};
+// Projection areas (how far a feature sits forward) genuinely can't be judged
+// from a front photo and want a profile/side shot. We detect interest in them
+// from the patient's free text. CLINICAL assumption — flagged for surgeon
+// review (docs).
+const PROFILE_KEYWORDS: { re: RegExp; area: string }[] = [
+  { re: /\b(jaw|jawline|jowl)/i, area: "jawline" },
+  { re: /\bchins?\b/i, area: "chin" }, // \b both sides so "chinese" doesn't trip it
+];
 
 // Front is required; side & angle are optional but make the read more accurate.
-export function Capture({ initialPhotos, goals = [], onDone }: Props) {
+export function Capture({ initialPhotos, concern = "", onDone }: Props) {
   const [photos, setPhotos] =
     useState<Partial<Record<ViewKey, string>>>(initialPhotos ?? {});
   // Start at the review screen if we already have a front photo; else capture it.
@@ -59,10 +60,12 @@ export function Capture({ initialPhotos, goals = [], onDone }: Props) {
     onDone(images);
   }
 
-  // If their goals are projection-based (jaw/chin), recommend a side photo —
-  // but only while they haven't added one. Encouraged, never required.
+  // If their concern mentions a projection area (jaw/chin), recommend a side
+  // photo — but only while they haven't added one. Encouraged, never required.
   const profileAreas = [
-    ...new Set(goals.map((g) => PROFILE_GOALS[g]).filter(Boolean)),
+    ...new Set(
+      PROFILE_KEYWORDS.filter((k) => k.re.test(concern)).map((k) => k.area),
+    ),
   ];
   const recommendProfile = profileAreas.length > 0 && !photos.profile;
 
