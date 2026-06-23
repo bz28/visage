@@ -65,7 +65,14 @@ export function BeforeAfter({
   }
 
   const showAfter = !!afterSrc;
-  const aspect = `${imageWidth} / ${imageHeight}`;
+  const sliderMode = mode === "slider" && showAfter;
+  // Side-by-side shows two full photos, so the frame is twice as wide — that
+  // keeps each column at the photo's own aspect, so object-cover doesn't crop
+  // and the pins line up.
+  const aspect =
+    mode === "side" && showAfter
+      ? `${imageWidth * 2} / ${imageHeight}`
+      : `${imageWidth} / ${imageHeight}`;
   // With no "after", the before must fill the frame regardless of slider state.
   const effSplit = showAfter ? split : 100;
 
@@ -73,10 +80,22 @@ export function BeforeAfter({
     <div className="flex flex-col gap-3">
       <div
         ref={frameRef}
-        className="relative mx-auto w-full max-w-2xl select-none overflow-hidden rounded-3xl bg-neutral-100 shadow-lg ring-1 ring-black/5"
+        className="relative mx-auto w-full max-w-2xl select-none overflow-hidden rounded-3xl bg-neutral-100 shadow-lg ring-1 ring-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
         style={{ aspectRatio: aspect }}
+        {...(sliderMode && {
+          role: "slider" as const,
+          tabIndex: 0,
+          "aria-label": "Drag to compare before and after",
+          "aria-valuemin": 0,
+          "aria-valuemax": 100,
+          "aria-valuenow": Math.round(effSplit),
+          onKeyDown: (e: React.KeyboardEvent) => {
+            if (e.key === "ArrowLeft") setSplit((s) => Math.max(0, s - 4));
+            else if (e.key === "ArrowRight") setSplit((s) => Math.min(100, s + 4));
+          },
+        })}
         onPointerDown={
-          mode === "slider" && showAfter
+          sliderMode
             ? (e) => {
                 setDrag(true);
                 try {
@@ -90,6 +109,8 @@ export function BeforeAfter({
         }
         onPointerMove={(e) => draggingRef.current && moveTo(e.clientX)}
         onPointerUp={() => setDrag(false)}
+        onPointerCancel={() => setDrag(false)}
+        onLostPointerCapture={() => setDrag(false)}
       >
         {mode === "side" && showAfter ? (
           // Side-by-side: now | with treatment.
@@ -100,7 +121,7 @@ export function BeforeAfter({
               <Caption side="left">Now</Caption>
             </div>
             <div className="relative overflow-hidden">
-              <Photo src={afterSrc} alt="Simulated result with the recommended treatment" reveal />
+              <Photo src={afterSrc} alt="Simulated result with the recommended treatment" reveal onReady={onAfterReady} />
               <Badge />
               <Caption side="right" accent>
                 With treatment
