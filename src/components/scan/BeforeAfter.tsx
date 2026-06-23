@@ -248,11 +248,14 @@ function Pins({
   imageHeight: number;
   highlightedArea?: string | null;
 }) {
+  // Only dim siblings when the highlighted area is actually shown as a pin (it
+  // may have just been toggled off — then nothing should dim).
+  const active = markers.some((m) => m.area === highlightedArea);
   return (
     <>
       {markers.map((m) => {
         const hi = m.area === highlightedArea;
-        const dim = !!highlightedArea && !hi;
+        const dim = active && !hi;
         return (
           <div
             key={m.area}
