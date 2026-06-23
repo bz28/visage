@@ -118,7 +118,7 @@ export function Capture({ initialPhotos, goals = [], onDone }: Props) {
                 </div>
                 <p className="truncate text-xs text-neutral-400">
                   {recommended
-                    ? `A side photo reads your ${profileAreas.join(" and ")} much surer.`
+                    ? `A side photo gives a much clearer read on your ${profileAreas.join(" and ")}.`
                     : v.instruction}
                 </p>
               </div>

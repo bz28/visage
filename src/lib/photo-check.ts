@@ -101,13 +101,13 @@ function faceBox(lm: Pt[]) {
 /** One friendly, education-register sentence for the soft warnings present. */
 export function warningMessage(warnings: PhotoWarning[]): string {
   if (warnings.includes("tilted")) {
-    return "Looks a little turned — a straight-on shot gives a surer read.";
+    return "Looks a little turned — a straight-on shot gives a clearer read.";
   }
   if (warnings.includes("too-small")) {
     return "Try getting a bit closer so your face fills more of the frame.";
   }
   if (warnings.includes("off-center")) {
-    return "Center your face in the frame for a surer read.";
+    return "Center your face in the frame for a clearer read.";
   }
   return "";
 }
