@@ -21,9 +21,9 @@ interface Props {
 type Mode = "slider" | "side";
 
 /**
- * The hero before/after. Default is a drag-to-reveal slider (the divider wipes
- * open when the result lands); a toggle switches to a side-by-side view. The
- * "now" photo carries pin + label markers for each area. Everything is plain
+ * The hero before/after. Defaults to side-by-side (both photos at once); a
+ * toggle switches to a drag-to-reveal slider (the divider wipes open when the
+ * result lands). The "now" photo carries pin + label markers. Everything is plain
  * <img> + positioned HTML so the labels stay crisp and never obscure the face.
  */
 export function BeforeAfter({
@@ -36,7 +36,9 @@ export function BeforeAfter({
   loading,
   placeholder,
 }: Props) {
-  const [mode, setMode] = useState<Mode>("slider");
+  // Default to side-by-side (the surgeon's explicit ask + immediately legible);
+  // the slider is the interactive enhancement behind the toggle.
+  const [mode, setMode] = useState<Mode>("side");
   const [split, setSplit] = useState(100); // start fully on "now"
   // `isDragging` drives the render (transition on/off); `draggingRef` is read
   // synchronously inside pointer handlers so no move events are missed.
