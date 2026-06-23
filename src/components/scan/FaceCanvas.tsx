@@ -94,7 +94,9 @@ export function FaceCanvas({
       }
       ctx.globalAlpha = 1;
 
-      // A label pill per area, at its point.
+      // A label pill per area, at its point. Every discussed area is labelled
+      // (so the photo matches the treatment-plan list); only simulatable areas
+      // additionally get the glow above, since those are the ones we can render.
       for (const m of markers) {
         drawLabel(ctx, AREA_LABELS[m.area], m.point.x * scale, m.point.y * scale);
       }

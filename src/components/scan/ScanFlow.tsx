@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { detectFace, type Pt } from "@/lib/landmarks";
 import { computeMeasurements } from "@/lib/measurements";
 import { baselineAssessment } from "@/lib/baseline";
@@ -63,11 +63,19 @@ export function ScanFlow() {
   const [combinedSrc, setCombinedSrc] = useState<string | null>(null);
   const [combinedLoading, setCombinedLoading] = useState(false);
   const [combinedFailed, setCombinedFailed] = useState(false);
+  // Bumped on each analyze/reset so a slow background generation can't write its
+  // result onto a flow the user has already moved on from (Book → Start over).
+  const genId = useRef(0);
 
   // Generate the combined "after" in one call, then composite all the treated
   // regions back onto the original so nothing else changes. Retries if the
   // harness rejects the generation (e.g. the mouth drifted on a lip edit).
-  async function generateCombined(f: Photo, lm: Pt[], areas: SimulatableArea[]) {
+  async function generateCombined(
+    f: Photo,
+    lm: Pt[],
+    areas: SimulatableArea[],
+    gen: number,
+  ) {
     if (areas.length === 0) return;
     setCombinedFailed(false);
     setCombinedLoading(true);
@@ -92,13 +100,15 @@ export function ScanFlow() {
         );
         if (result.ok && result.dataUrl) composited = result.dataUrl;
         else console.warn(`[combined] rejected, retrying: ${result.reason}`);
+        if (gen !== genId.current) return; // superseded — drop the result
       }
+      if (gen !== genId.current) return;
       if (composited) setCombinedSrc(composited);
       else setCombinedFailed(true);
     } catch {
-      setCombinedFailed(true);
+      if (gen === genId.current) setCombinedFailed(true);
     } finally {
-      setCombinedLoading(false);
+      if (gen === genId.current) setCombinedLoading(false);
     }
   }
 
@@ -175,6 +185,7 @@ export function ScanFlow() {
         { dataUrl: frontImg.dataUrl, width: w, height: h },
         landmarks,
         simAreas,
+        ++genId.current,
       );
     } catch {
       setError("Something went wrong reading that photo. Please try again.");
@@ -188,6 +199,7 @@ export function ScanFlow() {
     setFront(null);
     setAnalysis(null);
     setError(null);
+    genId.current++; // invalidate any in-flight combined generation
     setCombinedSrc(null);
     setCombinedFailed(false);
     setCombinedLoading(false);
