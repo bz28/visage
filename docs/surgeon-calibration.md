@@ -151,6 +151,39 @@ sanity-check them:
 
 ---
 
+## E. New areas added 2026-06-24 — assumptions to verify
+
+We expanded the area list beyond lips/chin/jawline/cheeks. These were built from
+standard aesthetic-medicine norms (not your specific practice) — please confirm
+or correct. Confidence: 🟢 standard · 🟡 reasonable, confirm · 🔴 genuine guess.
+
+**24. 🟡 Nasolabial folds — added as a DISCUSS + front before/after area.**
+We flag them only when a static fold (nose→mouth corner) is visible at rest, and
+frame treatment as *softening with support, never erasing* (a creaseless face
+reads overdone). Pin sits mid-fold (ala→mouth-corner midpoint).
+→ *Confirm:* is front-photo simulation appropriate here? Typical amount/side? The
+"soften not erase" framing right? *Change:* `ai.ts` guidance, `AREA_EDIT`/region
+in `simulation.ts`+`face-regions.ts` (PR 2).
+
+**25. 🟡 Marionette lines — added as DISCUSS + front before/after.**
+Flagged when lines (mouth-corner→chin) are visible; framed as support + a slight
+corner lift. Pin sits below the mouth corner toward the chin.
+→ *Confirm:* same questions as #24; is a slight commissure lift the right goal?
+
+**26. 🔴 Nose — added as DISCUSS-ONLY (no front before/after).**
+We flag a dorsal hump / under-projected tip but deliberately DON'T simulate it
+from a front photo: the real change is in profile and it's the highest-risk
+(vascular) area. Kept low/medium confidence, "best in profile, in person."
+→ *Confirm:* agree we should never sim the nose from a front photo? When (if
+ever) is non-surgical rhinoplasty worth showing — profile only? *Change:* would
+gate nose simulation (currently gated out via `SIMULATABLE`).
+
+**27. 🟡 Still NOT listed — confirm these stay out:** tear trough (vs our
+"under-eye"), masseter (tox, not filler), perioral/lip lines, earlobes.
+→ *Confirm:* anything common we're still missing for a *filler* tool?
+
+---
+
 ## How we'll use the answers
 - **A** → calibration constants for the warp (documented in code), inpaint prompt/strength tuning, and whether chin/cheeks need a profile photo.
 - **B** → concrete edits to the `ai.ts` system prompt, `baseline.ts` rules, `measurements.ts` targets, and the area list.

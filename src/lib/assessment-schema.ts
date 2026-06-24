@@ -1,15 +1,24 @@
 import { z } from "zod";
 
 /**
- * The filler-relevant facial areas v1 reasons about. Lips / chin / jawline are
- * the most reliable from a single frontal photo; cheeks / undereye / temples
- * are soft-tissue reads that really need the AI layer (and ideally a consult).
+ * The filler-relevant facial areas v1 reasons about. We DISCUSS all of these;
+ * only a subset gets a before/after (see SIMULATABLE in simulation.ts).
+ * - lips / chin / jawline / cheeks / nasolabial / marionette: front-readable,
+ *   simulated.
+ * - nose: discussed only — its real effect is in profile, and it's the
+ *   highest-risk (vascular) area, so we don't fake a front before/after.
+ * - undereye / temples: discussed only — high-risk/subtle (undereye) or
+ *   lateral + usually Sculptra (temples).
+ * Clinical scope flagged for surgeon review (docs/surgeon-calibration.md).
  */
 export const AREA_KEYS = [
   "lips",
   "chin",
   "jawline",
   "cheeks",
+  "nasolabial",
+  "marionette",
+  "nose",
   "undereye",
   "temples",
 ] as const;
@@ -19,6 +28,9 @@ export const AREA_LABELS: Record<(typeof AREA_KEYS)[number], string> = {
   chin: "Chin",
   jawline: "Jawline",
   cheeks: "Cheeks",
+  nasolabial: "Nasolabial folds",
+  marionette: "Marionette lines",
+  nose: "Nose",
   undereye: "Under-eye",
   temples: "Temples",
 };
