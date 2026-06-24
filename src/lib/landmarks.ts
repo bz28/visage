@@ -28,6 +28,7 @@ export const KEY = {
   trichion: 10, // top of forehead (hairline proxy)
   glabella: 9, // smooth area between the brows
   nasion: 168, // bridge of nose, between the eyes
+  noseTip: 1, // tip of the nose
   subnasale: 2, // where the nose meets the upper lip
   stomionUpper: 13, // upper-lip inner edge (mouth line, top)
   stomionLower: 14, // lower-lip inner edge (mouth line, bottom)

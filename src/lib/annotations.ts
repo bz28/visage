@@ -18,6 +18,12 @@ const centroid = (lm: Pt[], idx: readonly number[]): Pt => {
 
 const mid = (a: Pt, b: Pt): Pt => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
+// Point a fraction t of the way from a to b.
+const lerp = (a: Pt, b: Pt, t: number): Pt => ({
+  x: a.x + (b.x - a.x) * t,
+  y: a.y + (b.y - a.y) * t,
+});
+
 function pointFor(area: AssessmentArea["area"], lm: Pt[]): Pt {
   let point: Pt = lm[KEY.menton];
   switch (area) {
@@ -32,6 +38,17 @@ function pointFor(area: AssessmentArea["area"], lm: Pt[]): Pt {
       break;
     case "cheeks":
       point = centroid(lm, REGIONS.leftCheek);
+      break;
+    case "nasolabial":
+      // Midpoint of the left nostril edge → mouth corner (along the fold).
+      point = mid(lm[KEY.alarL], lm[KEY.mouthCornerL]);
+      break;
+    case "marionette":
+      // Below the left mouth corner, toward the chin.
+      point = lerp(lm[KEY.mouthCornerL], lm[KEY.menton], 0.45);
+      break;
+    case "nose":
+      point = lm[KEY.noseTip];
       break;
     case "undereye":
       point = mid(lm[KEY.eyeInnerL], lm[KEY.eyeOuterL]);
