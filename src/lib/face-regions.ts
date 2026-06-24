@@ -2,10 +2,10 @@ import { KEY, REGIONS, type Pt } from "./landmarks";
 import type { SimulatableArea } from "./simulation";
 
 /**
- * Paint an area's region onto a canvas as a soft, feathered shape. Shared by the
- * composite mask (filled white, to keep the AI edit) and the result-page
- * highlight (filled with the accent at low opacity, to show the treated area).
- * The caller sets the colour + globalAlpha; this owns the geometry + feathering.
+ * Paint an area's region onto a canvas as a soft, feathered shape — used to build
+ * the composite mask (filled white) that decides which pixels of the AI edit to
+ * keep. The caller sets the colour + globalAlpha; this owns the geometry +
+ * feathering.
  */
 export function paintAreaRegion(
   ctx: CanvasRenderingContext2D,
