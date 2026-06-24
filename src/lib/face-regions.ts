@@ -2,10 +2,10 @@ import { KEY, REGIONS, type Pt } from "./landmarks";
 import type { SimulatableArea } from "./simulation";
 
 /**
- * Paint an area's region onto a canvas as a soft, feathered shape. Shared by the
- * composite mask (filled white, to keep the AI edit) and the result-page
- * highlight (filled with the accent at low opacity, to show the treated area).
- * The caller sets the colour + globalAlpha; this owns the geometry + feathering.
+ * Paint an area's region onto a canvas as a soft, feathered shape — used to build
+ * the composite mask (filled white) that decides which pixels of the AI edit to
+ * keep. The caller sets the colour + globalAlpha; this owns the geometry +
+ * feathering.
  */
 export function paintAreaRegion(
   ctx: CanvasRenderingContext2D,
@@ -70,6 +70,36 @@ export function paintAreaRegion(
       }
       break;
     }
+    case "nasolabial": {
+      // A feathered band along each fold: nostril edge → mouth corner.
+      ctx.lineWidth = dilate * 3;
+      band(ctx, lm[KEY.alarR], lm[KEY.mouthCornerR]);
+      band(ctx, lm[KEY.alarL], lm[KEY.mouthCornerL]);
+      break;
+    }
+    case "marionette": {
+      // A band from each mouth corner angled down toward the chin.
+      const menton = lm[KEY.menton];
+      ctx.lineWidth = dilate * 3;
+      for (const corner of [lm[KEY.mouthCornerR], lm[KEY.mouthCornerL]]) {
+        if (corner && menton) band(ctx, corner, lerp(corner, menton, 0.6));
+      }
+      break;
+    }
   }
   ctx.restore();
+}
+
+const lerp = (a: Pt, b: Pt, t: number): Pt => ({
+  x: a.x + (b.x - a.x) * t,
+  y: a.y + (b.y - a.y) * t,
+});
+
+// Stroke a single feathered segment a→b (caller has set lineWidth + blur).
+function band(ctx: CanvasRenderingContext2D, a?: Pt, b?: Pt) {
+  if (!a || !b) return;
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.stroke();
 }

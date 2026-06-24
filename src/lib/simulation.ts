@@ -23,10 +23,19 @@ export const DEFAULT_LOOK: LookKey = "natural";
 /**
  * Areas we can preview from a single FRONT photo. Lips read best; chin, jawline,
  * and cheeks are best-effort here (chin/jaw projection really wants a profile) —
- * see the calibration doc. Other flagged areas (under-eye, temples) get the read
- * only — no front-photo preview.
+ * see the calibration doc. Nasolabial folds + marionette lines are surface
+ * creases we soften. Nose / under-eye / temples get the read only — no
+ * front-photo preview (nose's real change is profile + highest-risk; the others
+ * are subtle/high-risk).
  */
-export const SIMULATABLE = ["lips", "chin", "jawline", "cheeks"] as const;
+export const SIMULATABLE = [
+  "lips",
+  "chin",
+  "jawline",
+  "cheeks",
+  "nasolabial",
+  "marionette",
+] as const;
 export type SimulatableArea = (typeof SIMULATABLE)[number];
 
 export function isSimulatable(area: string): area is SimulatableArea {
@@ -38,6 +47,11 @@ const AREA_EDIT: Record<SimulatableArea, string> = {
   chin: "add dermal filler to the chin for a more defined, balanced lower face",
   jawline: "add dermal filler along the jawline for a sharper, cleaner angle",
   cheeks: "add dermal filler to the cheeks for a softly lifted midface",
+  // Soften, never erase — a flat, creaseless face reads overfilled (see docs).
+  nasolabial:
+    "gently soften the nasolabial folds (the lines from the nose to the mouth corners) with subtle filler support — ease them, do NOT erase them",
+  marionette:
+    "gently soften the marionette lines (from the mouth corners toward the chin) with subtle filler support and lightly lift the mouth corners — ease them, do NOT flatten the lower face",
 };
 
 // Assert the actual observed mouth state — far stronger than a generic "keep it

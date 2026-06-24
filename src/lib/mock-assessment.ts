@@ -3,9 +3,10 @@ import type { Assessment } from "./assessment-schema";
 /**
  * Dev-only canned assessment used when MOCK_ANALYZE is set (see api/analyze).
  * Lets UI work on the result/book screens run instantly and for free — no paid
- * vision call, no ~90s wait. Deliberately spans three areas with mixed
- * confidence (and one roughAmount) so it exercises the markers, chips, and
- * expand-on-tap exactly like a real read. Never used in production.
+ * vision call, no ~90s wait. Spans several simulatable areas with mixed
+ * confidence (including nasolabial + marionette, so the e2e exercises those
+ * region masks) plus one roughAmount. A real read returns at most 3 areas;
+ * this fixture deliberately carries more for coverage. Never used in production.
  *
  * Keep the copy in the same education-not-prescription register as the real AI,
  * so what we iterate against looks like what ships.
@@ -41,6 +42,22 @@ export const MOCK_ASSESSMENT: Assessment = {
       why: "Adding subtle structure along the jaw angle is a common way people explore a cleaner, more defined silhouette — best confirmed in profile, in person.",
       confidence: "low",
       priority: 3,
+    },
+    {
+      area: "nasolabial",
+      title: "Nasolabial softening",
+      observation: "The folds from the nose to the mouth corners read a touch deeper.",
+      why: "A little support softens these folds — easing them, never erasing them.",
+      confidence: "medium",
+      priority: 4,
+    },
+    {
+      area: "marionette",
+      title: "Marionette lines",
+      observation: "The lines from the mouth corners toward the chin sit slightly deeper.",
+      why: "Gentle support softens these lines and lifts the corners a touch.",
+      confidence: "low",
+      priority: 5,
     },
   ],
 };
