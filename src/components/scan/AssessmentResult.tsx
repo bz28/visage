@@ -39,11 +39,11 @@ export function AssessmentResult({
       {uniqueAreas.length > 0 ? (
         <>
           <div className="flex items-baseline justify-between gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-400">
               Areas we&apos;d explore
             </p>
             {uniqueAreas.length > 1 && (
-              <p className="text-xs text-neutral-400">
+              <p className="text-xs text-ink-400">
                 Point at an area to find it on your photo
               </p>
             )}
@@ -64,13 +64,13 @@ export function AssessmentResult({
                   onBlur={() => onHighlight(null)}
                   className={`flex items-start justify-between gap-3 rounded-2xl border p-4 transition-colors ${
                     on
-                      ? "border-border bg-surface hover:border-neutral-300"
-                      : "border-dashed border-neutral-300 bg-transparent"
+                      ? "border-border bg-surface hover:border-ink-300"
+                      : "border-dashed border-ink-300 bg-transparent"
                   }`}
                 >
                   <div className={on ? "" : "opacity-55"}>
                     <p className="font-medium">{label}</p>
-                    <p className="mt-0.5 text-sm leading-relaxed text-neutral-500">
+                    <p className="mt-0.5 text-sm leading-relaxed text-ink-500">
                       {a.why}
                     </p>
                   </div>
@@ -81,14 +81,14 @@ export function AssessmentResult({
           </ul>
         </>
       ) : (
-        <p className="rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-4 py-3.5 text-sm leading-relaxed text-neutral-600">
+        <p className="rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 px-4 py-3.5 text-sm leading-relaxed text-ink-600">
           Your features read beautifully balanced — there&apos;s nothing we&apos;d
           push. If you&apos;re curious, a consultation is the best place to explore
           subtle refinements.
         </p>
       )}
 
-      <p className="text-xs leading-relaxed text-neutral-400">{DISCLAIMER}</p>
+      <p className="text-xs leading-relaxed text-ink-400">{DISCLAIMER}</p>
 
       <div className="z-10 flex flex-col gap-2.5 rounded-2xl border border-border bg-surface/95 p-3 shadow-lg backdrop-blur md:sticky md:bottom-4">
         <button
@@ -97,7 +97,7 @@ export function AssessmentResult({
         >
           Book a consultation
         </button>
-        <p className="flex items-center justify-center gap-1.5 text-center text-xs text-neutral-500">
+        <p className="flex items-center justify-center gap-1.5 text-center text-xs text-ink-500">
           <svg
             viewBox="0 0 24 24"
             className="size-3.5 shrink-0 text-[var(--accent)]"
@@ -143,18 +143,18 @@ function Switch({
     >
       <span
         className={`text-[11px] font-medium uppercase tracking-wide ${
-          on ? "text-[var(--accent)]" : "text-neutral-400"
+          on ? "text-[var(--accent)]" : "text-ink-400"
         }`}
       >
         {on ? "In preview" : "Off"}
       </span>
       <span
         className={`relative h-5 w-9 rounded-full transition-colors ${
-          on ? "bg-[var(--accent)]" : "bg-neutral-300"
+          on ? "bg-[var(--accent)]" : "bg-ink-300"
         }`}
       >
         <span
-          className={`absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition-all ${
+          className={`absolute top-0.5 size-4 rounded-full bg-white shadow-card transition-all ${
             on ? "left-[18px]" : "left-0.5"
           }`}
         />

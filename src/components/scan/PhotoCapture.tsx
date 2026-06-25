@@ -122,7 +122,7 @@ export function PhotoCapture({
     return (
       <div className="flex flex-col items-center gap-3 py-12 text-center">
         <span className="size-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
-        <p className="text-sm text-neutral-500">Checking your photo…</p>
+        <p className="text-sm text-ink-500">Checking your photo…</p>
       </div>
     );
   }
@@ -136,7 +136,7 @@ export function PhotoCapture({
           alt=""
           className="w-full max-w-xs rounded-2xl"
         />
-        <p className="mx-auto max-w-xs text-sm leading-relaxed text-neutral-600">
+        <p className="mx-auto max-w-xs text-sm leading-relaxed text-ink-600">
           {pending.message}
         </p>
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -151,7 +151,7 @@ export function PhotoCapture({
           </button>
           <button
             onClick={() => onCapture(pending.dataUrl)}
-            className="rounded-full border border-neutral-300 px-7 py-3 font-medium"
+            className="rounded-full border border-ink-300 px-7 py-3 font-medium"
           >
             Use anyway
           </button>
@@ -207,7 +207,7 @@ export function PhotoCapture({
                 streamRef.current?.getTracks().forEach((t) => t.stop());
                 onCancel();
               }}
-              className="rounded-full border border-neutral-300 px-6 py-3 font-medium"
+              className="rounded-full border border-ink-300 px-6 py-3 font-medium"
             >
               Back
             </button>
@@ -233,7 +233,7 @@ export function PhotoCapture({
       </div>
       <div>
         <h2 className="font-display text-xl font-semibold">{label} photo</h2>
-        <p className="mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-neutral-500">
+        <p className="mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-ink-500">
           {instruction}{" "}
           Your photo is only used to create your result — we don&apos;t keep it.
         </p>
@@ -247,13 +247,13 @@ export function PhotoCapture({
         </button>
         <button
           onClick={() => fileRef.current?.click()}
-          className="rounded-full border border-neutral-300 px-7 py-3 font-medium"
+          className="rounded-full border border-ink-300 px-7 py-3 font-medium"
         >
           Upload a photo
         </button>
       </div>
       {onCancel && (
-        <button onClick={onCancel} className="text-sm text-neutral-400 underline">
+        <button onClick={onCancel} className="text-sm text-ink-400 underline">
           Back
         </button>
       )}

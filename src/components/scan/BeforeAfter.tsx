@@ -45,7 +45,7 @@ export function BeforeAfter({
 
   return (
     <div
-      className="mx-auto grid w-full max-w-2xl grid-cols-2 overflow-hidden rounded-3xl bg-neutral-100 shadow-lg ring-1 ring-black/5"
+      className="mx-auto grid w-full max-w-2xl grid-cols-2 overflow-hidden rounded-3xl bg-ink-100 shadow-lg ring-1 ring-black/5"
       style={{ aspectRatio: aspect }}
     >
       <div className="relative overflow-hidden border-r border-white/60">
@@ -59,7 +59,7 @@ export function BeforeAfter({
         />
         <Caption side="left">Now</Caption>
       </div>
-      <div className="relative overflow-hidden bg-neutral-100">
+      <div className="relative overflow-hidden bg-ink-100">
         {showAfter ? (
           <>
             <Photo
@@ -74,12 +74,12 @@ export function BeforeAfter({
             {loading ? (
               <>
                 <span className="size-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
-                <span className="text-xs text-neutral-500">
+                <span className="text-xs text-ink-500">
                   Creating your preview…
                 </span>
               </>
             ) : (
-              <span className="text-xs text-neutral-400">{placeholder}</span>
+              <span className="text-xs text-ink-400">{placeholder}</span>
             )}
           </div>
         )}

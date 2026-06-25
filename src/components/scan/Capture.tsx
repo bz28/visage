@@ -83,7 +83,7 @@ export function Capture({ initialPhotos, concern = "", onDone }: Props) {
     <div className="flex flex-col gap-4">
       <div>
         <h2 className="font-display text-xl font-semibold">Your photos</h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-neutral-500">
+        <p className="mt-1.5 text-sm leading-relaxed text-ink-500">
           The front photo is all we need. Adding a side photo lets us preview
           your chin, jaw, and nose from the side too.
         </p>
@@ -100,10 +100,10 @@ export function Capture({ initialPhotos, concern = "", onDone }: Props) {
               className={`flex items-center gap-3 rounded-xl border p-3 ${
                 recommended
                   ? "border-[var(--accent)]/50 bg-[var(--accent)]/5"
-                  : "border-neutral-200"
+                  : "border-ink-200"
               }`}
             >
-              <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-100">
+              <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-ink-100">
                 {url ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img src={url} alt="" className="size-full object-cover" />
@@ -124,13 +124,13 @@ export function Capture({ initialPhotos, concern = "", onDone }: Props) {
                     </span>
                   ) : (
                     !v.required && (
-                      <span className="ml-2 text-xs text-neutral-400">
+                      <span className="ml-2 text-xs text-ink-400">
                         optional
                       </span>
                     )
                   )}
                 </div>
-                <p className="truncate text-xs text-neutral-400">
+                <p className="truncate text-xs text-ink-400">
                   {recommended
                     ? `The clearest way to read your ${areas.join(" and ")}.`
                     : VIEW_GOOD_FOR[v.key]
@@ -140,7 +140,7 @@ export function Capture({ initialPhotos, concern = "", onDone }: Props) {
               </div>
               <button
                 onClick={() => setCapturing(v.key)}
-                className="shrink-0 rounded-full border border-neutral-300 px-4 py-1.5 text-sm font-medium"
+                className="shrink-0 rounded-full border border-ink-300 px-4 py-1.5 text-sm font-medium"
               >
                 {url ? "Retake" : "Add"}
               </button>
@@ -156,7 +156,7 @@ export function Capture({ initialPhotos, concern = "", onDone }: Props) {
       >
         See my read
       </button>
-      <p className="text-center text-xs text-neutral-400">
+      <p className="text-center text-xs text-ink-400">
         We use your photos only to create your result — we don&apos;t store
         them.
       </p>

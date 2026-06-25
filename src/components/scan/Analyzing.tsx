@@ -35,7 +35,7 @@ export function Analyzing({ dataUrl }: Props) {
           /* eslint-disable-next-line @next/next/no-img-element */
           <img src={dataUrl} alt="" className="w-full" />
         ) : (
-          <div className="aspect-square w-full bg-neutral-100" />
+          <div className="aspect-square w-full bg-ink-100" />
         )}
         {/* Sweeping scan line over a soft scrim. */}
         <div className="absolute inset-0 bg-black/15" />
@@ -51,7 +51,7 @@ export function Analyzing({ dataUrl }: Props) {
           </p>
         </div>
       </div>
-      <p className="max-w-xs text-center text-xs text-neutral-400">
+      <p className="max-w-xs text-center text-xs text-ink-400">
         Reading carefully — a considered look takes a few seconds.
       </p>
     </div>

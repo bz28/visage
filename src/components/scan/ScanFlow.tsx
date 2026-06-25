@@ -444,7 +444,7 @@ export function ScanFlow() {
                 <br />
                 the way we do
               </h1>
-              <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-neutral-500">
+              <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-ink-500">
                 A quick, private look at the areas we might explore together — and
                 why. Think of it as the start of a conversation, best continued in
                 person.
@@ -485,7 +485,7 @@ export function ScanFlow() {
               <h1 className="mt-2 font-display text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
                 Here&apos;s what we&apos;d explore together
               </h1>
-              <p className="mx-auto mt-3 max-w-2xl text-[15px] leading-relaxed text-neutral-600 md:mx-0">
+              <p className="mx-auto mt-3 max-w-2xl text-[15px] leading-relaxed text-ink-600 md:mx-0">
                 {analysis.assessment.summary}
               </p>
             </header>
@@ -497,7 +497,7 @@ export function ScanFlow() {
             {analysis.assessment.areas.length > 0 && (
               <div className="flex flex-col gap-2">
                 {profile && (profileSrc || profileLoading || profileFailed) && (
-                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
                     Front
                   </p>
                 )}
@@ -528,7 +528,7 @@ export function ScanFlow() {
                 Shows projection (chin / jaw / nose) the front can't. */}
             {profile && (profileSrc || profileLoading || profileFailed) && (
               <div className="flex flex-col gap-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
                   Profile
                 </p>
                 <BeforeAfter
