@@ -30,7 +30,7 @@ export function StepProgress({ current }: Props) {
                   ? "font-semibold text-foreground"
                   : state === "done"
                     ? "font-medium text-[var(--accent)]"
-                    : "font-medium text-neutral-400"
+                    : "font-medium text-ink-400"
               }`}
             >
               {label}

@@ -31,7 +31,7 @@ function Chip({
       className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
         active
           ? "border-[var(--accent)] bg-[var(--accent)]/10"
-          : "border-neutral-300 hover:border-neutral-400"
+          : "border-ink-300 hover:border-ink-400"
       }`}
     >
       {children}
@@ -61,10 +61,10 @@ export function Intake({ onSubmit }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-6 rounded-3xl border border-border bg-surface p-6 shadow-sm sm:p-8">
+      <div className="flex flex-col gap-6 rounded-3xl border border-border bg-surface p-6 shadow-card sm:p-8">
         <div>
           <h2 className="font-display text-xl font-semibold">A couple of quick things</h2>
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="mt-1 text-sm text-ink-500">
             Just enough to make your read personal. All optional.
           </p>
         </div>
@@ -96,7 +96,7 @@ export function Intake({ onSubmit }: Props) {
             onChange={(e) => setConcern(e.target.value)}
             rows={3}
             placeholder="In your words — e.g. “I look tired,” “fuller lips,” “a sharper jaw.”"
-            className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm leading-relaxed transition-colors focus:border-[var(--accent)] focus:outline-none"
+            className="w-full rounded-lg border border-ink-300 px-3 py-2.5 text-sm leading-relaxed transition-colors focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/25"
           />
         </Field>
       </div>
@@ -105,7 +105,7 @@ export function Intake({ onSubmit }: Props) {
           too (no separate "Skip", which read as a confusing second choice). */}
       <button
         onClick={submit}
-        className="rounded-full bg-foreground px-7 py-4 font-medium text-background shadow-sm transition-transform active:scale-[0.99]"
+        className="rounded-full bg-foreground px-7 py-4 font-medium text-background shadow-card transition-transform active:scale-[0.99]"
       >
         Continue
       </button>
@@ -122,7 +122,7 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <label className="text-sm font-medium text-neutral-600">{label}</label>
+      <label className="text-sm font-medium text-ink-600">{label}</label>
       {children}
     </div>
   );
