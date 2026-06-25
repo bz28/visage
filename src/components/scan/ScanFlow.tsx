@@ -81,6 +81,7 @@ export function ScanFlow() {
   const [profile, setProfile] = useState<Photo | null>(null);
   const [profileSrc, setProfileSrc] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [profileFailed, setProfileFailed] = useState(false);
   // Areas the patient currently wants included (defaults to all recommended).
   // A ref mirrors it so async paths (a slow generation completing) read the
   // CURRENT selection, not the value captured when they started.
@@ -197,6 +198,7 @@ export function ScanFlow() {
     gen: number,
   ) {
     if (areas.length === 0) return;
+    setProfileFailed(false);
     setProfileLoading(true);
     try {
       const img = await loadImage(dataUrl);
@@ -228,9 +230,13 @@ export function ScanFlow() {
         if (gen !== genId.current) return;
       }
       if (gen !== genId.current) return;
+      // The panel is already mounted (setProfile ran); if generation didn't
+      // produce a result, mark it failed so it shows a note instead of an
+      // endless spinner that then vanishes.
       if (composited) setProfileSrc(composited);
+      else setProfileFailed(true);
     } catch {
-      // graceful — no profile result
+      if (gen === genId.current) setProfileFailed(true);
     } finally {
       if (gen === genId.current) setProfileLoading(false);
     }
@@ -276,6 +282,8 @@ export function ScanFlow() {
 
       let assessment = baseline;
       try {
+        // Cap the wait so a hung AI call can't strand the patient on the
+        // analyzing screen — on timeout we fall through to the baseline read.
         const res = await fetch("/api/analyze", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -287,13 +295,14 @@ export function ScanFlow() {
               base64: i.dataUrl.split(",")[1],
             })),
           }),
+          signal: AbortSignal.timeout(120_000),
         });
         if (res.ok) {
           const data: { assessment: Assessment } = await res.json();
           assessment = data.assessment;
         }
       } catch {
-        // keep baseline
+        // timed out or failed — keep the baseline read
       }
 
       const { markers } = buildAnnotations(assessment.areas, landmarks);
@@ -343,6 +352,7 @@ export function ScanFlow() {
     setProfile(null);
     setProfileSrc(null);
     setProfileLoading(false);
+    setProfileFailed(false);
     applySelection(new Set());
     setStep("intake");
   }
@@ -413,49 +423,60 @@ export function ScanFlow() {
               </p>
             </header>
 
-            {/* Front before/after (the hero). Labelled "Front" only when a
-                profile result is also shown below. */}
-            <div className="flex flex-col gap-2">
-              {profile && (profileSrc || profileLoading) && (
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-                  Front
-                </p>
-              )}
-              <BeforeAfter
-                beforeSrc={front.dataUrl}
-                afterSrc={combinedSrc}
-                imageWidth={front.width}
-                imageHeight={front.height}
-                markers={analysis.markers.filter((m) => selected.has(m.area))}
-                highlightedArea={highlightedArea}
-                onPinClick={(area) =>
-                  setHighlightedArea((cur) => (cur === area ? null : area))
-                }
-                loading={combinedLoading}
-                placeholder={
-                  combinedFailed
-                    ? "Preview unavailable — your read still stands."
-                    : ![...selected].some(isSimulatable)
-                      ? "Switch an area on below to see your preview."
-                      : undefined
-                }
-              />
-            </div>
+            {/* Front before/after (the hero) — only when there are areas to
+                show; a "balanced" read with no areas has nothing to preview.
+                Labelled "Front" only when a profile result is also shown.
+                Keyed by the photo so slider state resets on a new scan. */}
+            {analysis.assessment.areas.length > 0 && (
+              <div className="flex flex-col gap-2">
+                {profile && (profileSrc || profileLoading || profileFailed) && (
+                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                    Front
+                  </p>
+                )}
+                <BeforeAfter
+                  key={front.dataUrl}
+                  beforeSrc={front.dataUrl}
+                  afterSrc={combinedSrc}
+                  imageWidth={front.width}
+                  imageHeight={front.height}
+                  markers={analysis.markers.filter((m) => selected.has(m.area))}
+                  highlightedArea={highlightedArea}
+                  onPinClick={(area) =>
+                    setHighlightedArea((cur) => (cur === area ? null : area))
+                  }
+                  loading={combinedLoading}
+                  placeholder={
+                    combinedFailed
+                      ? "Preview unavailable — your read still stands."
+                      : ![...selected].some(isSimulatable)
+                        ? "Switch an area on below to see your preview."
+                        : undefined
+                  }
+                />
+              </div>
+            )}
 
             {/* Profile before/after — only when a usable side photo was given.
                 Shows projection (chin / jaw / nose) the front can't. */}
-            {profile && (profileSrc || profileLoading) && (
+            {profile && (profileSrc || profileLoading || profileFailed) && (
               <div className="flex flex-col gap-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
                   Profile
                 </p>
                 <BeforeAfter
+                  key={profile.dataUrl}
                   beforeSrc={profile.dataUrl}
                   afterSrc={profileSrc}
                   imageWidth={profile.width}
                   imageHeight={profile.height}
                   markers={[]}
                   loading={profileLoading}
+                  placeholder={
+                    profileFailed
+                      ? "Profile preview wasn't available — your front read still stands."
+                      : undefined
+                  }
                 />
               </div>
             )}
