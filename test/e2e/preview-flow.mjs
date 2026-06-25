@@ -163,22 +163,17 @@ async function main() {
     await page.getByText(/areas we'd explore/i).waitFor({ timeout: 30_000 });
 
     log("waiting for the combined before/after to render…");
-    // The "With treatment" image generates in the background; wait for the front
-    // one (.first(), since the profile path adds a second matching image).
-    await page
-      .locator('img[alt*="Simulated preview"]')
-      .first()
-      .waitFor({ timeout: 60_000 });
-
-    // Assert it actually decoded (non-zero dimensions).
-    const dims = await page.evaluate(() => {
-      const img = document.querySelector('img[alt*="Simulated preview"]');
-      return img ? { w: img.naturalWidth, h: img.naturalHeight } : null;
-    });
-    if (!dims || dims.w === 0 || dims.h === 0) {
-      fail(`combined preview did not render (dims=${JSON.stringify(dims)})`);
-    }
-    log(`combined before/after rendered (${dims.w}×${dims.h}).`);
+    // The "With treatment" image generates in the background. Wait until it's
+    // actually DECODED (not just laid out) — visibility alone leaves naturalWidth
+    // at 0 and would flake. .first() since the profile path adds a 2nd match.
+    await page.waitForFunction(
+      () => {
+        const img = document.querySelector('img[alt*="Simulated preview"]');
+        return !!img && img.complete && img.naturalWidth > 0;
+      },
+      { timeout: 60_000 },
+    );
+    log("combined before/after rendered (decoded).");
 
     // The profile (two-angle) before/after also renders from the side photo.
     // It runs two composite passes (validate + paint the selection), each a

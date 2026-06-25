@@ -18,6 +18,7 @@ import {
   type ProfileArea,
 } from "@/lib/simulation";
 import { warpAreas } from "@/lib/warp";
+import { loadImage } from "@/lib/image";
 import type { Assessment } from "@/lib/assessment-schema";
 import type { Intake as IntakeData } from "@/lib/intake-schema";
 import type { ViewKey } from "@/lib/views";
@@ -49,15 +50,6 @@ interface Analysis {
   assessment: Assessment;
   markers: Marker[];
   landmarks: Pt[];
-}
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
 }
 
 export function ScanFlow() {
@@ -176,16 +168,15 @@ export function ScanFlow() {
         // Paste for the CURRENT selection (the user may have toggled while the
         // generation was running), not just the areas we generated.
         recompose(selectedRef.current);
-        setCombinedLoading(false);
       } else {
         setCombinedFailed(true);
-        setCombinedLoading(false);
       }
     } catch {
-      if (gen === genId.current) {
-        setCombinedFailed(true);
-        setCombinedLoading(false);
-      }
+      if (gen === genId.current) setCombinedFailed(true);
+    } finally {
+      // One teardown for every path (mirrors generateProfile); the guard keeps a
+      // superseded generation from clearing the new flow's spinner.
+      if (gen === genId.current) setCombinedLoading(false);
     }
   }
 
@@ -300,8 +291,10 @@ export function ScanFlow() {
 
       let assessment = baseline;
       try {
-        // Cap the wait so a hung AI call can't strand the patient on the
-        // analyzing screen — on timeout we fall through to the baseline read.
+        // Cap just past the route's maxDuration (60s) — the function is killed
+        // server-side at 60s anyway, so a slightly-longer client cap lets that
+        // failure surface and fall through to the baseline read, rather than
+        // aborting a still-valid response early.
         const res = await fetch("/api/analyze", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -313,7 +306,7 @@ export function ScanFlow() {
               base64: i.dataUrl.split(",")[1],
             })),
           }),
-          signal: AbortSignal.timeout(120_000),
+          signal: AbortSignal.timeout(65_000),
         });
         if (res.ok) {
           const data: { assessment: Assessment } = await res.json();
@@ -510,9 +503,9 @@ export function ScanFlow() {
                       )}
 
                       {/* Profile before/after — only when a usable side photo
-                          was given. Shows projection the front can't. */}
-                      {profile &&
-                        (profileSrc || profileLoading || profileFailed) && (
+                          was given. Shows projection the front can't. (Same
+                          `showProfile` that drives the grid, so they can't drift.) */}
+                      {showProfile && profile && (
                           <div className="flex flex-col gap-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
                               Profile

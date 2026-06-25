@@ -14,7 +14,13 @@ export async function POST(req: Request) {
   try {
     await saveLead(lead);
   } catch (err) {
-    console.error("[api/leads] failed to save lead:", err);
+    // Log only the message — never the raw error: a Neon/Resend failure can
+    // attach request context (the recipient, the failing row) that carries the
+    // patient's name/contact. Matches ai.ts + simulate/route.ts (privacy invariant).
+    console.error(
+      "[api/leads] failed to save lead:",
+      err instanceof Error ? err.message : String(err),
+    );
     return NextResponse.json({ error: "Could not save" }, { status: 500 });
   }
 

@@ -1,6 +1,7 @@
 import { detectFace, type Pt } from "./landmarks";
 import { computeMeasurements } from "./measurements";
 import { mouthOpenness } from "./composite";
+import { loadImage } from "./image";
 import type { ViewKey } from "./views";
 
 /**
@@ -40,15 +41,6 @@ const MOUTH_OPEN_WARN = 0.055;
 const BLUR_MIN_VARIANCE = 12; // Laplacian variance below this = soft/out of focus
 const DARK_MAX = 45; // mean luminance (0–255) below this = underexposed
 const BRIGHT_MIN = 215; // above this = blown out
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
 
 /**
  * Tilt/framing warnings apply ONLY to the front photo — a profile/angle shot is

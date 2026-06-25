@@ -4,11 +4,10 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 import {
   SIMULATABLE,
-  PROFILE_AREAS,
   LOOK_KEYS,
+  DEFAULT_LOOK,
   buildPrompt,
   buildCombinedPrompt,
-  buildProfilePrompt,
 } from "@/lib/simulation";
 
 export const runtime = "nodejs";
@@ -18,9 +17,8 @@ const bodySchema = z.object({
   /** Source photo as a data URL. */
   image: z.string().min(1),
   // Patient flow: all recommended areas in one combined edit (front photo).
+  // (The profile before/after is an on-device geometric warp now — no API.)
   areas: z.array(z.enum(SIMULATABLE)).min(1).max(6).optional(),
-  // Profile flow: projection areas edited from a side photo.
-  profileAreas: z.array(z.enum(PROFILE_AREAS)).min(1).max(3).optional(),
   // Clinician flow: a single area at a chosen look.
   area: z.enum(SIMULATABLE).optional(),
   look: z.enum(LOOK_KEYS).optional(),
@@ -43,14 +41,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  // Combined front (areas) · profile (profileAreas) · single-area (clinician).
+  // Combined front (areas) · single-area (clinician tool, not yet wired up).
   let prompt: string;
   if (body.areas?.length) {
     prompt = buildCombinedPrompt(body.areas, body.mouthOpen);
-  } else if (body.profileAreas?.length) {
-    prompt = buildProfilePrompt(body.profileAreas);
   } else if (body.area) {
-    prompt = buildPrompt(body.area, body.look ?? "natural", body.mouthOpen);
+    prompt = buildPrompt(body.area, body.look ?? DEFAULT_LOOK, body.mouthOpen);
   } else {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
