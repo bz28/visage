@@ -195,9 +195,10 @@ export function ScanFlow() {
     if (front && analysis && generatedRaw) {
       void recompose(next, generatedRaw, genId.current, front, analysis.landmarks);
     }
-    // The profile preview (chin / jaw / nose) re-pastes too, so toggling those
-    // areas updates both views consistently.
-    if (profileRawRef.current) void recomposeProfile(next);
+    // The profile preview (chin / jaw / nose) re-pastes too — but only when a
+    // projection area was toggled, so a lips/cheeks toggle doesn't needlessly
+    // re-composite (and flicker) the profile panel.
+    if (profileRawRef.current && isProfileArea(area)) void recomposeProfile(next);
   }
 
   // Generate the optional profile before/after: detect landmarks on the side
