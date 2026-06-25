@@ -63,7 +63,7 @@ export function BeforeAfter({
         <Caption side="left">Now</Caption>
       </div>
       <div
-        className="relative select-none overflow-hidden bg-ink-100"
+        className="relative select-none touch-pan-y overflow-hidden bg-ink-100"
         onPointerDown={showAfter ? () => setComparing(true) : undefined}
         onPointerUp={() => setComparing(false)}
         onPointerLeave={() => setComparing(false)}
@@ -132,7 +132,7 @@ function Photo({
       alt={alt}
       draggable={false}
       onLoad={() => setLoaded(true)}
-      className={`absolute inset-0 size-full object-cover transition-all duration-700 ease-out ${
+      className={`absolute inset-0 size-full object-cover transition-all duration-700 ease-out motion-reduce:!scale-100 motion-reduce:!blur-0 ${
         reveal && !loaded
           ? "scale-[1.03] opacity-0 blur-[3px]"
           : "scale-100 opacity-100 blur-0"
