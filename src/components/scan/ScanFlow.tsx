@@ -5,7 +5,12 @@ import { detectFace, type Pt } from "@/lib/landmarks";
 import { computeMeasurements } from "@/lib/measurements";
 import { baselineAssessment } from "@/lib/baseline";
 import { buildAnnotations, type Marker } from "@/lib/annotations";
-import { compositeAreas, isMouthOpen } from "@/lib/composite";
+import {
+  prepareComposite,
+  pasteComposite,
+  isMouthOpen,
+  type CompositePrep,
+} from "@/lib/composite";
 import {
   isSimulatable,
   isProfileArea,
@@ -73,7 +78,10 @@ export function ScanFlow() {
   const [combinedSrc, setCombinedSrc] = useState<string | null>(null);
   const [combinedLoading, setCombinedLoading] = useState(false);
   const [combinedFailed, setCombinedFailed] = useState(false);
-  const [generatedRaw, setGeneratedRaw] = useState<string | null>(null);
+  // The prepared front generation (loaded images + gen landmarks + transform),
+  // computed ONCE when the generation lands. Toggling areas re-pastes a subset
+  // from this — a pure canvas op, no face-detect — so it's instant.
+  const frontPrepRef = useRef<CompositePrep | null>(null);
 
   // The optional PROFILE (side-view) before/after — projection areas (chin / jaw
   // / nose) shown from the side, where their real effect reads. Only when a
@@ -82,15 +90,11 @@ export function ScanFlow() {
   const [profileSrc, setProfileSrc] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileFailed, setProfileFailed] = useState(false);
-  // The cached profile generation (the raw output that passed the harness, its
-  // landmarks, the photo, and the projection areas it covered) — so toggling a
-  // chin/jaw/nose area re-pastes a subset of the SAME generation, just like the
-  // front. Refs (not state) because the async paths read the current values.
-  const profileRawRef = useRef<string | null>(null);
-  const profileLmRef = useRef<Pt[] | null>(null);
-  const profilePhotoRef = useRef<Photo | null>(null);
+  // The prepared profile generation + the projection areas it covered — so
+  // toggling a chin/jaw/nose area re-pastes a subset of the SAME generation,
+  // just like the front. Refs because the async paths read the current values.
+  const profilePrepRef = useRef<CompositePrep | null>(null);
   const profileAreasRef = useRef<ProfileArea[]>([]);
-  const profileRecomposeId = useRef(0);
   // Areas the patient currently wants included (defaults to all recommended).
   // A ref mirrors it so async paths (a slow generation completing) read the
   // CURRENT selection, not the value captured when they started.
@@ -99,43 +103,30 @@ export function ScanFlow() {
   // Bumped on each analyze/reset so a slow background generation can't write its
   // result onto a flow the user has already moved on from (Book → Start over).
   const genId = useRef(0);
-  // Bumped on each recompose so that when toggles overlap, only the latest one
-  // writes the image (composites can resolve out of order).
-  const recomposeId = useRef(0);
 
   function applySelection(next: Set<string>) {
     selectedRef.current = next;
     setSelected(next);
   }
 
-  // Composite the cached generation down to the currently-selected regions.
-  // Pasting a subset is a fast local canvas op — toggling never re-calls the
-  // model. `gen` guards against a flow the user has left; `req` against an
-  // overlapping later recompose.
-  async function recompose(sel: Set<string>, raw: string, gen: number, f: Photo, lm: Pt[]) {
-    const req = ++recomposeId.current;
-    const live = () => gen === genId.current && req === recomposeId.current;
+  // Re-paste the cached generation down to the currently-selected regions — a
+  // pure canvas op (no face-detect), so toggling is instant and free. Sync, so
+  // there's no out-of-order race; the prep ref is cleared on reset.
+  function recompose(sel: Set<string>) {
+    const prep = frontPrepRef.current;
+    if (!prep) return;
     const simSel = [...sel].filter(isSimulatable);
     if (simSel.length === 0) {
-      if (live()) {
-        setCombinedSrc(null);
-        setCombinedLoading(false);
-      }
+      setCombinedSrc(null);
       return;
     }
-    setCombinedLoading(true);
-    try {
-      const r = await compositeAreas(f.dataUrl, lm, simSel, raw, f.width, f.height);
-      if (!live()) return; // superseded by a newer recompose / flow
-      if (r.ok && r.dataUrl) setCombinedSrc(r.dataUrl);
-    } finally {
-      if (live()) setCombinedLoading(false);
-    }
+    const dataUrl = pasteComposite(prep, simSel);
+    if (dataUrl) setCombinedSrc(dataUrl);
   }
 
   // Generate the combined "after" once, retrying if the harness rejects it
-  // (e.g. the mouth drifted on a lip edit). On success we cache the raw output
-  // so toggling areas can re-paste a subset without a new generation.
+  // (e.g. the mouth drifted on a lip edit). On success we cache the PREPARED
+  // generation (detect + transform done once) so toggling re-pastes instantly.
   async function generateCombined(
     f: Photo,
     lm: Pt[],
@@ -147,8 +138,8 @@ export function ScanFlow() {
     setCombinedLoading(true);
     try {
       const mouthOpen = isMouthOpen(lm);
-      let raw: string | null = null;
-      for (let attempt = 0; attempt < 3 && !raw; attempt++) {
+      let prep: CompositePrep | null = null;
+      for (let attempt = 0; attempt < 3 && !prep; attempt++) {
         const res = await fetch("/api/simulate", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -156,8 +147,8 @@ export function ScanFlow() {
         });
         const data: { image?: string; fallback?: boolean } = await res.json();
         if (!data.image) break; // server fell back (no key / refusal / error)
-        // Composite once to run the harness; keep the raw output if it passes.
-        const result = await compositeAreas(
+        // Prepare once: this runs the harness (mouth-drift) + caches the detect.
+        const prepared = await prepareComposite(
           f.dataUrl,
           lm,
           areas,
@@ -165,16 +156,17 @@ export function ScanFlow() {
           f.width,
           f.height,
         );
-        if (result.ok) raw = data.image;
-        else console.warn(`[combined] rejected, retrying: ${result.reason}`);
+        if (prepared.ok && prepared.prep) prep = prepared.prep;
+        else console.warn(`[combined] rejected, retrying: ${prepared.reason}`);
         if (gen !== genId.current) return; // superseded — drop the result
       }
       if (gen !== genId.current) return;
-      if (raw) {
-        setGeneratedRaw(raw);
-        // Composite for the CURRENT selection (the user may have toggled while
-        // the generation was running), not just the areas we generated.
-        await recompose(selectedRef.current, raw, gen, f, lm);
+      if (prep) {
+        frontPrepRef.current = prep;
+        // Paste for the CURRENT selection (the user may have toggled while the
+        // generation was running), not just the areas we generated.
+        recompose(selectedRef.current);
+        setCombinedLoading(false);
       } else {
         setCombinedFailed(true);
         setCombinedLoading(false);
@@ -192,13 +184,11 @@ export function ScanFlow() {
     if (next.has(area)) next.delete(area);
     else next.add(area);
     applySelection(next);
-    if (front && analysis && generatedRaw) {
-      void recompose(next, generatedRaw, genId.current, front, analysis.landmarks);
-    }
+    if (frontPrepRef.current) recompose(next);
     // The profile preview (chin / jaw / nose) re-pastes too — but only when a
     // projection area was toggled, so a lips/cheeks toggle doesn't needlessly
-    // re-composite (and flicker) the profile panel.
-    if (profileRawRef.current && isProfileArea(area)) void recomposeProfile(next);
+    // re-paste the profile panel.
+    if (profilePrepRef.current && isProfileArea(area)) recomposeProfile(next);
   }
 
   // Generate the optional profile before/after: detect landmarks on the side
@@ -222,10 +212,10 @@ export function ScanFlow() {
       if (gen !== genId.current) return; // superseded while detecting
       const photo: Photo = { dataUrl, width: w, height: h };
       setProfile(photo);
-      // Generate once (retrying on harness rejection) and cache the raw output
-      // that passes, so toggling re-pastes a subset for free — like the front.
-      let raw: string | null = null;
-      for (let attempt = 0; attempt < 3 && !raw; attempt++) {
+      // Generate once (retrying on harness rejection) and cache the PREPARED
+      // generation, so toggling re-pastes a subset for free — like the front.
+      let prep: CompositePrep | null = null;
+      for (let attempt = 0; attempt < 3 && !prep; attempt++) {
         const res = await fetch("/api/simulate", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -233,7 +223,7 @@ export function ScanFlow() {
         });
         const data: { image?: string } = await res.json();
         if (!data.image) break;
-        const result = await compositeAreas(
+        const prepared = await prepareComposite(
           dataUrl,
           det.landmarks,
           areas,
@@ -241,22 +231,20 @@ export function ScanFlow() {
           w,
           h,
         );
-        if (result.ok) raw = data.image;
-        else console.warn(`[profile] rejected, retrying: ${result.reason}`);
+        if (prepared.ok && prepared.prep) prep = prepared.prep;
+        else console.warn(`[profile] rejected, retrying: ${prepared.reason}`);
         if (gen !== genId.current) return;
       }
       if (gen !== genId.current) return;
       // The panel is already mounted (setProfile ran); if generation didn't
       // produce a usable output, mark it failed so it shows a note instead of an
       // endless spinner that then vanishes.
-      if (raw) {
-        profileRawRef.current = raw;
-        profileLmRef.current = det.landmarks;
-        profilePhotoRef.current = photo;
+      if (prep) {
+        profilePrepRef.current = prep;
         profileAreasRef.current = areas;
         // Paste for the CURRENT selection (the patient may have toggled a
         // projection area off while this was generating).
-        await recomposeProfile(selectedRef.current);
+        recomposeProfile(selectedRef.current);
       } else {
         setProfileFailed(true);
       }
@@ -268,41 +256,20 @@ export function ScanFlow() {
   }
 
   // Profile equivalent of recompose: re-paste the cached profile generation down
-  // to the selected projection areas (chin / jaw / nose). Same free local canvas
-  // op; if no projection area is selected, the profile preview drops away (it
+  // to the selected projection areas (chin / jaw / nose) — a free local canvas
+  // op. If no projection area is selected, the profile preview drops away (it
   // exists only to show projection). Separate from `recompose` rather than a
   // param-heavy shared helper — the two read different state and stay readable.
-  async function recomposeProfile(sel: Set<string>) {
-    const raw = profileRawRef.current;
-    const lm = profileLmRef.current;
-    const photo = profilePhotoRef.current;
-    if (!raw || !lm || !photo) return;
-    const req = ++profileRecomposeId.current;
-    const gen = genId.current;
-    const live = () => gen === genId.current && req === profileRecomposeId.current;
+  function recomposeProfile(sel: Set<string>) {
+    const prep = profilePrepRef.current;
+    if (!prep) return;
     const picked = profileAreasRef.current.filter((a) => sel.has(a));
     if (picked.length === 0) {
-      if (live()) {
-        setProfileSrc(null);
-        setProfileLoading(false);
-      }
+      setProfileSrc(null);
       return;
     }
-    setProfileLoading(true);
-    try {
-      const r = await compositeAreas(
-        photo.dataUrl,
-        lm,
-        picked,
-        raw,
-        photo.width,
-        photo.height,
-      );
-      if (!live()) return;
-      if (r.ok && r.dataUrl) setProfileSrc(r.dataUrl);
-    } finally {
-      if (live()) setProfileLoading(false);
-    }
+    const dataUrl = pasteComposite(prep, picked);
+    if (dataUrl) setProfileSrc(dataUrl);
   }
 
   async function analyze(images: CapturedImage[]) {
@@ -372,7 +339,7 @@ export function ScanFlow() {
       setAnalysis({ assessment, markers, landmarks });
       // Start with every recommended area selected (the full plan).
       applySelection(new Set(assessment.areas.map((a) => a.area)));
-      setGeneratedRaw(null);
+      frontPrepRef.current = null;
       setCombinedSrc(null);
       setStep("result");
 
@@ -411,14 +378,12 @@ export function ScanFlow() {
     setCombinedSrc(null);
     setCombinedFailed(false);
     setCombinedLoading(false);
-    setGeneratedRaw(null);
+    frontPrepRef.current = null;
     setProfile(null);
     setProfileSrc(null);
     setProfileLoading(false);
     setProfileFailed(false);
-    profileRawRef.current = null;
-    profileLmRef.current = null;
-    profilePhotoRef.current = null;
+    profilePrepRef.current = null;
     profileAreasRef.current = [];
     applySelection(new Set());
     setStep("intake");
