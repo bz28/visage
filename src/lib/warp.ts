@@ -87,12 +87,15 @@ function buildControls(
   for (const i of ANCHORS) {
     if (lm[i]) controls.push({ p: lm[i], d: { x: 0, y: 0 } });
   }
-  // The face's "forward" (sagittal) direction in 2D: from the centre toward the
-  // nose tip. On a profile this points along the silhouette (so projection reads
-  // as moving forward); on a front face it's tiny (projection barely shows). We
-  // blend it 70/30 with each point's own outward direction so the chin still
-  // gains a little drop and the jaw a little flare, not pure horizontal slide.
+  // Angle-aware direction. `turn` ≈ how far the head is turned (0 = head-on,
+  // 1 = full profile), from how far the nose tip sits off the face midline.
+  // - On a PROFILE we push along the sagittal "forward" axis (toward the nose
+  //   tip) — the chin/jaw/nose project forward along the silhouette.
+  // - On a FRONT we push each point OUTWARD from the centre — a sharper jawline
+  //   and a more defined chin read laterally, which is what shows head-on.
+  // We lerp between them by `turn`, so the same engine is correct at any angle.
   const fwd = norm(sub(lm[KEY.noseTip], centre));
+  const turn = Math.min(1, Math.abs(lm[KEY.noseTip].x - centre.x) / (scale * 0.5));
   const movers: Control[] = [];
   for (const area of areas) {
     const cfg = AREA_WARP[area];
@@ -100,7 +103,7 @@ function buildControls(
       const p = lm[i];
       if (!p) continue;
       const out = norm(sub(p, centre));
-      const dir = norm(add(mul(fwd, 0.7), mul(out, 0.3)));
+      const dir = norm(add(mul(fwd, turn), mul(out, 1 - turn)));
       const c = { p, d: mul(dir, cfg.mag * scale) };
       controls.push(c);
       movers.push(c);
