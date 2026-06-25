@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ViewKey } from "@/lib/views";
 import { checkPhoto, warningMessage } from "@/lib/photo-check";
 import { PoseIllustration } from "./PoseIllustration";
+import { Button } from "@/components/ui/Button";
 
 interface Props {
   view: ViewKey;
@@ -122,7 +123,7 @@ export function PhotoCapture({
     return (
       <div className="flex flex-col items-center gap-3 py-12 text-center">
         <span className="size-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
-        <p className="text-sm text-neutral-500">Checking your photo…</p>
+        <p className="text-sm text-ink-500">Checking your photo…</p>
       </div>
     );
   }
@@ -136,25 +137,26 @@ export function PhotoCapture({
           alt=""
           className="w-full max-w-xs rounded-2xl"
         />
-        <p className="mx-auto max-w-xs text-sm leading-relaxed text-neutral-600">
+        <p className="mx-auto max-w-xs text-sm leading-relaxed text-ink-600">
           {pending.message}
         </p>
         <div className="flex flex-col gap-3 sm:flex-row">
-          <button
+          <Button
             onClick={() => {
               setPending(null);
               setMode("choose");
             }}
-            className="rounded-full bg-foreground px-7 py-3 font-medium text-background"
+            className="px-7 py-3"
           >
             Retake
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => onCapture(pending.dataUrl)}
-            className="rounded-full border border-neutral-300 px-7 py-3 font-medium"
+            className="px-7 py-3"
           >
             Use anyway
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -202,22 +204,20 @@ export function PhotoCapture({
         </div>
         <div className="flex gap-3">
           {onCancel && (
-            <button
+            <Button
+              variant="ghost"
               onClick={() => {
                 streamRef.current?.getTracks().forEach((t) => t.stop());
                 onCancel();
               }}
-              className="rounded-full border border-neutral-300 px-6 py-3 font-medium"
+              className="px-6 py-3"
             >
               Back
-            </button>
+            </Button>
           )}
-          <button
-            onClick={snap}
-            className="rounded-full bg-foreground px-8 py-3 font-medium text-background"
-          >
+          <Button onClick={snap} className="px-8 py-3">
             Take photo
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -233,27 +233,25 @@ export function PhotoCapture({
       </div>
       <div>
         <h2 className="font-display text-xl font-semibold">{label} photo</h2>
-        <p className="mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-neutral-500">
+        <p className="mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-ink-500">
           {instruction}{" "}
           Your photo is only used to create your result — we don&apos;t keep it.
         </p>
       </div>
       <div className="flex flex-col gap-3 sm:flex-row">
-        <button
-          onClick={startCamera}
-          className="rounded-full bg-foreground px-7 py-3 font-medium text-background"
-        >
+        <Button onClick={startCamera} className="px-7 py-3">
           Use camera
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
           onClick={() => fileRef.current?.click()}
-          className="rounded-full border border-neutral-300 px-7 py-3 font-medium"
+          className="px-7 py-3"
         >
           Upload a photo
-        </button>
+        </Button>
       </div>
       {onCancel && (
-        <button onClick={onCancel} className="text-sm text-neutral-400 underline">
+        <button onClick={onCancel} className="text-sm text-ink-400 underline">
           Back
         </button>
       )}
@@ -264,7 +262,11 @@ export function PhotoCapture({
         className="hidden"
         onChange={onFile}
       />
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-red-600">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

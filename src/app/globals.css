@@ -19,6 +19,28 @@
   --color-border: var(--border);
   --font-sans: var(--font-geist-sans);
   --font-serif: var(--font-fraunces);
+
+  /* Warm neutral "ink" ramp — replaces Tailwind's cool neutral-* greys, which
+     read muddy on the warm paper. Lightness tracks the greys they replace, just
+     tinted warm, so contrast stays put. */
+  --color-ink-900: #171513;
+  --color-ink-700: #46403a;
+  --color-ink-600: #6f665c;
+  --color-ink-500: #8c8378;
+  --color-ink-400: #a99f93;
+  --color-ink-300: #d0c8bd;
+  --color-ink-200: #e7e1d9;
+  --color-ink-100: #f1ede7;
+
+  /* Elevation — warm-tuned, two believable steps. Cards get -card; the sticky
+     CTA / hero get -pop. */
+  --shadow-card: 0 1px 2px rgba(23, 21, 19, 0.04), 0 6px 20px -6px rgba(23, 21, 19, 0.08);
+  --shadow-pop: 0 10px 34px -8px rgba(23, 21, 19, 0.16);
+
+  /* Radius scale, applied by surface role: inputs/chips, cards/rows, hero. */
+  --radius-input: 0.625rem;
+  --radius-card: 1rem;
+  --radius-hero: 1.5rem;
 }
 
 body {
@@ -54,8 +76,25 @@ body {
   animation: scan-sweep 2.6s ease-in-out infinite;
 }
 
+/* Gentle entrance for each step / staggered list items — a translateY+fade with
+   a soft, slightly-overshooting ease so the flow feels considered, not static. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-rise {
+  animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .scan-sweep {
+  .scan-sweep,
+  .animate-rise {
     animation: none;
   }
 }

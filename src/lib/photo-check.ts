@@ -1,5 +1,6 @@
 import { detectFace, type Pt } from "./landmarks";
 import { computeMeasurements } from "./measurements";
+import { mouthOpenness } from "./composite";
 import type { ViewKey } from "./views";
 
 /**
@@ -10,7 +11,14 @@ import type { ViewKey } from "./views";
  * Soft `warnings` are skippable nudges — we never dead-end a lead-gen flow.
  */
 export type PhotoStatus = "ok" | "no-face" | "multiple-faces";
-export type PhotoWarning = "tilted" | "too-small" | "off-center";
+export type PhotoWarning =
+  | "tilted"
+  | "too-small"
+  | "off-center"
+  | "mouth-open"
+  | "blurry"
+  | "dark"
+  | "bright";
 
 export interface PhotoCheck {
   status: PhotoStatus;
@@ -24,6 +32,14 @@ export interface PhotoCheck {
 const TILT_MAX = 0.18; // frontalTilt above this reads as too turned (0 = straight-on)
 const MIN_FACE_FRACTION = 0.34; // face should span ≥ this fraction of the image width
 const MAX_OFFCENTER = 0.2; // face centre within this fraction of the image centre
+// An open mouth makes the lip preview fail the expression guard (it can't add
+// volume without re-drawing the mouth). 0.055 = clearly parted, between a relaxed
+// mouth (~0.02) and the openness that reliably fails (~0.077). CV tuning.
+const MOUTH_OPEN_WARN = 0.055;
+// Technical image-quality limits, tuned by eye on a 192px-wide downscale.
+const BLUR_MIN_VARIANCE = 12; // Laplacian variance below this = soft/out of focus
+const DARK_MAX = 45; // mean luminance (0–255) below this = underexposed
+const BRIGHT_MIN = 215; // above this = blown out
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -67,8 +83,18 @@ export async function checkPhoto(
   }
 
   const warnings: PhotoWarning[] = [];
+
+  // Blur / exposure apply to any view — a soft or badly-lit shot wastes the AI
+  // call and disappoints regardless of angle.
+  const px = analyzePixels(img);
+  if (px.variance < BLUR_MIN_VARIANCE) warnings.push("blurry");
+  if (px.luminance < DARK_MAX) warnings.push("dark");
+  else if (px.luminance > BRIGHT_MIN) warnings.push("bright");
+
   if (view === "front") {
     const lm = result.landmarks;
+    // Open mouth → the lip preview will likely fail the expression guard.
+    if (mouthOpenness(lm) > MOUTH_OPEN_WARN) warnings.push("mouth-open");
     if (computeMeasurements(lm).frontalTilt > TILT_MAX) warnings.push("tilted");
 
     const box = faceBox(lm);
@@ -82,6 +108,52 @@ export async function checkPhoto(
   }
 
   return { status: "ok", warnings };
+}
+
+/**
+ * One downscaled pass for blur + exposure. Sharpness = variance of the Laplacian
+ * (a standard focus measure — a sharp image has lots of high-frequency edges, so
+ * high variance; a blurry one is smooth, so low). Exposure = mean luminance.
+ */
+function analyzePixels(img: HTMLImageElement): {
+  variance: number;
+  luminance: number;
+} {
+  const w = 192;
+  const h = Math.max(1, Math.round((img.naturalHeight / img.naturalWidth) * w));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return { variance: Infinity, luminance: 128 }; // can't analyze → don't warn
+  ctx.drawImage(img, 0, 0, w, h);
+  const data = ctx.getImageData(0, 0, w, h).data;
+
+  const gray = new Float64Array(w * h);
+  let lumSum = 0;
+  for (let i = 0; i < w * h; i++) {
+    const g =
+      0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
+    gray[i] = g;
+    lumSum += g;
+  }
+
+  let lapSum = 0;
+  let lapSqSum = 0;
+  let n = 0;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const lap =
+        4 * gray[i] - gray[i - 1] - gray[i + 1] - gray[i - w] - gray[i + w];
+      lapSum += lap;
+      lapSqSum += lap * lap;
+      n++;
+    }
+  }
+  const mean = n ? lapSum / n : 0;
+  const variance = n ? lapSqSum / n - mean * mean : Infinity;
+  return { variance, luminance: lumSum / (w * h) };
 }
 
 function faceBox(lm: Pt[]) {
@@ -98,8 +170,21 @@ function faceBox(lm: Pt[]) {
   return { minX, minY, maxX, maxY };
 }
 
-/** One friendly, education-register sentence for the soft warnings present. */
+/** One friendly, education-register sentence for the soft warnings present.
+ *  Ordered by impact — the mouth/quality issues cost the most if ignored. */
 export function warningMessage(warnings: PhotoWarning[]): string {
+  if (warnings.includes("mouth-open")) {
+    return "Relax your mouth — closed, no teeth — for the truest lip preview.";
+  }
+  if (warnings.includes("blurry")) {
+    return "That shot looks a little soft — hold steady for a sharper photo.";
+  }
+  if (warnings.includes("dark")) {
+    return "It's a bit dark — even, front-on light gives a clearer read.";
+  }
+  if (warnings.includes("bright")) {
+    return "That's a little bright — softer light keeps more detail.";
+  }
   if (warnings.includes("tilted")) {
     return "Looks a little turned — a straight-on shot gives a clearer read.";
   }

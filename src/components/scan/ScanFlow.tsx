@@ -95,6 +95,9 @@ export function ScanFlow() {
   // just like the front. Refs because the async paths read the current values.
   const profilePrepRef = useRef<CompositePrep | null>(null);
   const profileAreasRef = useRef<ProfileArea[]>([]);
+  // The preview (photo) column — so toggling can scroll it back into view on
+  // mobile, where it's stacked above the plan and easily scrolled past.
+  const previewRef = useRef<HTMLDivElement>(null);
   // Areas the patient currently wants included (defaults to all recommended).
   // A ref mirrors it so async paths (a slow generation completing) read the
   // CURRENT selection, not the value captured when they started.
@@ -189,6 +192,12 @@ export function ScanFlow() {
     // projection area was toggled, so a lips/cheeks toggle doesn't needlessly
     // re-paste the profile panel.
     if (profilePrepRef.current && isProfileArea(area)) recomposeProfile(next);
+    // On mobile the preview can be scrolled out of view while toggling below it;
+    // bring it back so the change is actually seen (no-op when it's visible).
+    const el = previewRef.current;
+    if (el && el.getBoundingClientRect().bottom < 80) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   }
 
   // Generate the optional profile before/after: detect landmarks on the side
@@ -400,7 +409,8 @@ export function ScanFlow() {
     <div className="mx-auto flex w-full flex-col items-center gap-8 sm:gap-10">
       <StepProgress current={STAGE_INDEX[step]} />
 
-      <div className={`w-full ${shell}`}>
+      {/* key={step} re-mounts on each transition so the entrance replays. */}
+      <div key={step} className={`w-full ${shell} animate-rise`}>
         {step === "intake" && (
           <div className="flex flex-col gap-8">
             <header className="text-center">
@@ -409,7 +419,7 @@ export function ScanFlow() {
                 <br />
                 the way we do
               </h1>
-              <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-neutral-500">
+              <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-ink-500">
                 A quick, private look at the areas we might explore together — and
                 why. Think of it as the start of a conversation, best continued in
                 person.
@@ -427,7 +437,10 @@ export function ScanFlow() {
         {step === "capture" && (
           <div className="flex flex-col gap-6">
             {error && (
-              <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <p
+                role="alert"
+                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+              >
                 {error}
               </p>
             )}
@@ -441,91 +454,129 @@ export function ScanFlow() {
 
         {step === "analyzing" && <Analyzing dataUrl={front?.dataUrl} />}
 
-        {step === "result" && front && analysis && (
-          <div className="flex flex-col gap-7">
-            <header className="text-center md:text-left">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
-                Your read
-              </p>
-              <h1 className="mt-2 font-display text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-                Here&apos;s what we&apos;d explore together
-              </h1>
-              <p className="mx-auto mt-3 max-w-2xl text-[15px] leading-relaxed text-neutral-600 md:mx-0">
-                {analysis.assessment.summary}
-              </p>
-            </header>
-
-            {/* Front before/after (the hero) — only when there are areas to
-                show; a "balanced" read with no areas has nothing to preview.
-                Labelled "Front" only when a profile result is also shown.
-                Keyed by the photo so slider state resets on a new scan. */}
-            {analysis.assessment.areas.length > 0 && (
-              <div className="flex flex-col gap-2">
-                {profile && (profileSrc || profileLoading || profileFailed) && (
-                  <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-                    Front
+        {step === "result" &&
+          front &&
+          analysis &&
+          (() => {
+            const showProfile = !!(
+              profile &&
+              (profileSrc || profileLoading || profileFailed)
+            );
+            const hasFront = analysis.assessment.areas.length > 0;
+            const hasPreview = hasFront || showProfile;
+            return (
+              <div className="flex flex-col gap-7">
+                <header className="text-center md:text-left">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
+                    Your read
                   </p>
-                )}
-                <BeforeAfter
-                  key={front.dataUrl}
-                  beforeSrc={front.dataUrl}
-                  afterSrc={combinedSrc}
-                  imageWidth={front.width}
-                  imageHeight={front.height}
-                  markers={analysis.markers.filter((m) => selected.has(m.area))}
-                  highlightedArea={highlightedArea}
-                  onPinClick={(area) =>
-                    setHighlightedArea((cur) => (cur === area ? null : area))
-                  }
-                  loading={combinedLoading}
-                  placeholder={
-                    combinedFailed
-                      ? "Preview unavailable — your read still stands."
-                      : ![...selected].some(isSimulatable)
-                        ? "Switch an area on below to see your preview."
-                        : undefined
-                  }
-                />
-              </div>
-            )}
+                  <h1 className="mt-2 font-display text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+                    Here&apos;s what we&apos;d explore together
+                  </h1>
+                  <p className="mx-auto mt-3 max-w-2xl text-[15px] leading-relaxed text-ink-600 md:mx-0">
+                    {analysis.assessment.summary}
+                  </p>
+                </header>
 
-            {/* Profile before/after — only when a usable side photo was given.
-                Shows projection (chin / jaw / nose) the front can't. */}
-            {profile && (profileSrc || profileLoading || profileFailed) && (
-              <div className="flex flex-col gap-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-                  Profile
-                </p>
-                <BeforeAfter
-                  key={profile.dataUrl}
-                  beforeSrc={profile.dataUrl}
-                  afterSrc={profileSrc}
-                  imageWidth={profile.width}
-                  imageHeight={profile.height}
-                  markers={[]}
-                  loading={profileLoading}
-                  placeholder={
-                    profileFailed
-                      ? "Profile preview wasn't available — your front read still stands."
-                      : undefined
-                  }
-                />
-              </div>
-            )}
+                {/* On desktop: photos on the left (sticky, stays in view while
+                    the plan scrolls), plan + CTA on the right — so toggling an
+                    area updates a photo you can still see. Mobile stacks. */}
+                <div
+                  className={`flex flex-col gap-7 ${
+                    hasPreview
+                      ? "lg:grid lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:items-start"
+                      : ""
+                  }`}
+                >
+                  {hasPreview && (
+                    <div
+                      ref={previewRef}
+                      className="flex flex-col gap-5 lg:sticky lg:top-6"
+                    >
+                      {/* Front before/after (the hero). Labelled "Front" only
+                          when a profile result is also shown. Keyed by the photo
+                          so per-scan UI state resets on a new scan. */}
+                      {hasFront && (
+                        <div className="flex flex-col gap-2">
+                          {showProfile && (
+                            <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+                              Front
+                            </p>
+                          )}
+                          <BeforeAfter
+                            key={front.dataUrl}
+                            beforeSrc={front.dataUrl}
+                            afterSrc={combinedSrc}
+                            imageWidth={front.width}
+                            imageHeight={front.height}
+                            markers={analysis.markers.filter((m) =>
+                              selected.has(m.area),
+                            )}
+                            highlightedArea={highlightedArea}
+                            onPinClick={(area) =>
+                              setHighlightedArea((cur) =>
+                                cur === area ? null : area,
+                              )
+                            }
+                            loading={combinedLoading}
+                            placeholder={
+                              combinedFailed
+                                ? "Preview unavailable — your read still stands."
+                                : ![...selected].some(isSimulatable)
+                                  ? "Switch an area on below to see your preview."
+                                  : undefined
+                            }
+                          />
+                        </div>
+                      )}
 
-            <AssessmentResult
-              assessment={analysis.assessment}
-              selected={selected}
-              onToggle={toggleArea}
-              onHighlight={setHighlightedArea}
-              onBook={() => setStep("book")}
-            />
-          </div>
-        )}
+                      {/* Profile before/after — only when a usable side photo
+                          was given. Shows projection the front can't. */}
+                      {profile &&
+                        (profileSrc || profileLoading || profileFailed) && (
+                          <div className="flex flex-col gap-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+                              Profile
+                            </p>
+                            <BeforeAfter
+                              key={profile.dataUrl}
+                              beforeSrc={profile.dataUrl}
+                              afterSrc={profileSrc}
+                              imageWidth={profile.width}
+                              imageHeight={profile.height}
+                              markers={[]}
+                              loading={profileLoading}
+                              placeholder={
+                                profileFailed
+                                  ? "Profile preview wasn't available — your front read still stands."
+                                  : undefined
+                              }
+                            />
+                          </div>
+                        )}
+                    </div>
+                  )}
+
+                  <AssessmentResult
+                    assessment={analysis.assessment}
+                    selected={selected}
+                    onToggle={toggleArea}
+                    onHighlight={setHighlightedArea}
+                    onBook={() => setStep("book")}
+                  />
+                </div>
+              </div>
+            );
+          })()}
 
         {step === "book" && analysis && (
           <BookConsult
-            interests={[...new Set(analysis.assessment.areas.map((a) => a.area))]}
+            // The areas the patient actually KEPT in their preview (in priority
+            // order), not the full recommended set — that's what they're telling
+            // the clinic they care about.
+            interests={[...new Set(analysis.assessment.areas.map((a) => a.area))].filter(
+              (area) => selected.has(area),
+            )}
             onDone={reset}
           />
         )}
