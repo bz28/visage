@@ -18,14 +18,23 @@ interface Props {
   onDone: (images: CapturedImage[]) => void;
 }
 
-// Projection areas (how far a feature sits forward) genuinely can't be judged
-// from a front photo and want a profile/side shot. We detect interest in them
-// from the patient's free text. CLINICAL assumption — flagged for surgeon
-// review (docs).
-const PROFILE_KEYWORDS: { re: RegExp; area: string }[] = [
-  { re: /\b(jaw|jawline|jowl)/i, area: "jawline" },
-  { re: /\bchins?\b/i, area: "chin" }, // \b both sides so "chinese" doesn't trip it
+// The optional angles read areas the front can't: the SIDE for projection
+// (jaw / chin / nose — how far things sit forward), the ¾ ANGLE for cheek /
+// midface volume. We detect interest from the patient's free text and nudge for
+// the photo that helps. CLINICAL assumption — flagged for surgeon review (docs).
+const VIEW_HINTS: { re: RegExp; view: ViewKey; area: string }[] = [
+  { re: /\b(jaw|jawline|jowl)/i, view: "profile", area: "jawline" },
+  { re: /\bchins?\b/i, view: "profile", area: "chin" }, // \b both sides so "chinese" doesn't trip it
+  { re: /\b(nose|nostril|bridge)/i, view: "profile", area: "nose" },
+  { re: /\bcheeks?\b/i, view: "threequarter", area: "cheeks" },
 ];
+
+// What each optional angle reads best — shown as a STATIC note so anyone curious
+// about those areas knows to add the photo, regardless of what they typed.
+const VIEW_GOOD_FOR: Partial<Record<ViewKey, string>> = {
+  profile: "jawline, chin & nose",
+  threequarter: "cheeks & midface",
+};
 
 // Front is required; side & angle are optional but make the read more accurate.
 export function Capture({ initialPhotos, concern = "", onDone }: Props) {
@@ -60,14 +69,18 @@ export function Capture({ initialPhotos, concern = "", onDone }: Props) {
     onDone(images);
   }
 
-  // If their concern mentions a projection area (jaw/chin), recommend a side
-  // photo — but only while they haven't added one. Encouraged, never required.
-  const profileAreas = [
-    ...new Set(
-      PROFILE_KEYWORDS.filter((k) => k.re.test(concern)).map((k) => k.area),
-    ),
-  ];
-  const recommendProfile = profileAreas.length > 0 && !photos.profile;
+  // Areas the concern suggests would read better from a given optional angle.
+  // Encouraged, never required.
+  const hintedAreas = (view: ViewKey) =>
+    view === "front"
+      ? []
+      : [
+          ...new Set(
+            VIEW_HINTS.filter(
+              (h) => h.view === view && h.re.test(concern),
+            ).map((h) => h.area),
+          ),
+        ];
 
   return (
     <div className="flex flex-col gap-4">
@@ -82,7 +95,8 @@ export function Capture({ initialPhotos, concern = "", onDone }: Props) {
       <div className="flex flex-col gap-3">
         {VIEWS.map((v) => {
           const url = photos[v.key];
-          const recommended = v.key === "profile" && recommendProfile;
+          const areas = hintedAreas(v.key);
+          const recommended = areas.length > 0 && !url;
           return (
             <div
               key={v.key}
@@ -121,8 +135,10 @@ export function Capture({ initialPhotos, concern = "", onDone }: Props) {
                 </div>
                 <p className="truncate text-xs text-neutral-400">
                   {recommended
-                    ? `A side photo gives a much clearer read on your ${profileAreas.join(" and ")}.`
-                    : v.instruction}
+                    ? `The clearest way to read your ${areas.join(" and ")}.`
+                    : VIEW_GOOD_FOR[v.key]
+                      ? `Best for your ${VIEW_GOOD_FOR[v.key]}.`
+                      : v.instruction}
                 </p>
               </div>
               <button
