@@ -4,15 +4,20 @@ import type { ProfileArea } from "./simulation";
 /**
  * Deterministic geometric warp — the projection half of the simulation engine
  * (see docs/simulation-architecture.md). It moves the patient's OWN pixels to
- * simulate added projection (chin / jaw / nose), so it's identity-perfect, free
- * (on-device, no API), and consistent on every angle (it's driven by the 3D
- * face mesh). Generative AI is only a later photoreal finisher on top of this.
+ * simulate added projection (chin / jaw / nose), so it's identity-perfect and
+ * free (on-device, no API).
+ *
+ * Today the displacement direction is computed in 2D (a "forward" axis from the
+ * face centre to the nose tip), which works because the warp runs on the actual
+ * photo at its actual angle. The landmark depth (z) is captured but not yet used
+ * — it's the foundation for a true 3D-surface direction later.
  *
  * How it works: a set of "mover" landmarks for the chosen area are displaced
- * outward along the face's surface direction; "anchor" landmarks (eyes, brow)
- * stay put. We build a smooth displacement field from those control points
- * (inverse-distance weighted), apply it to a grid laid over the photo, and
- * render the photo through the warped grid (piecewise-affine, GPU-fast).
+ * forward; "anchor" landmarks (eyes, brow, cheekbones) stay put. We build a
+ * smooth displacement field from those control points (inverse-distance
+ * weighted), apply it to a grid laid over the photo, render through the warped
+ * grid (piecewise-affine, GPU-fast), then paste only the projection region back
+ * onto the untouched original so everything else stays exact.
  *
  * All magnitudes here are CLINICAL PLACEHOLDERS — they get calibrated to real
  * millimetres from the surgeon's before/after photos (surgeon-calibration.md).
@@ -63,7 +68,10 @@ interface Control {
   d: Pt;
 }
 
-function buildControls(lm: Pt[], areas: ProfileArea[]): Control[] {
+function buildControls(
+  lm: Pt[],
+  areas: ProfileArea[],
+): { controls: Control[]; movers: Control[]; scale: number } {
   // Face centre = mean of the stable anchors; "outward" = away from it.
   const stable = ANCHORS.map((i) => lm[i]).filter(Boolean);
   const centre = mul(
@@ -85,6 +93,7 @@ function buildControls(lm: Pt[], areas: ProfileArea[]): Control[] {
   // blend it 70/30 with each point's own outward direction so the chin still
   // gains a little drop and the jaw a little flare, not pure horizontal slide.
   const fwd = norm(sub(lm[KEY.noseTip], centre));
+  const movers: Control[] = [];
   for (const area of areas) {
     const cfg = AREA_WARP[area];
     for (const i of cfg.movers) {
@@ -92,10 +101,43 @@ function buildControls(lm: Pt[], areas: ProfileArea[]): Control[] {
       if (!p) continue;
       const out = norm(sub(p, centre));
       const dir = norm(add(mul(fwd, 0.7), mul(out, 0.3)));
-      controls.push({ p, d: mul(dir, cfg.mag * scale) });
+      const c = { p, d: mul(dir, cfg.mag * scale) };
+      controls.push(c);
+      movers.push(c);
     }
   }
-  return controls;
+  return { controls, movers, scale };
+}
+
+/**
+ * A feathered mask over just the projection region (the movers + where they
+ * project to), so we paste the warp back onto the ORIGINAL photo and leave
+ * everything else pixel-for-pixel untouched — true identity lock, no global
+ * resample of eyes/hair/background.
+ */
+function regionMask(
+  movers: Control[],
+  scale: number,
+  width: number,
+  height: number,
+): HTMLCanvasElement {
+  const mask = document.createElement("canvas");
+  mask.width = width;
+  mask.height = height;
+  const ctx = mask.getContext("2d")!;
+  ctx.fillStyle = "#fff";
+  ctx.filter = `blur(${scale * 0.06}px)`;
+  const r = scale * 0.13;
+  for (const m of movers) {
+    // cover both the original point and where it projects to
+    ctx.beginPath();
+    ctx.arc(m.p.x, m.p.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(m.p.x + m.d.x, m.p.y + m.d.y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  return mask;
 }
 
 /** Inverse-distance-weighted displacement at an arbitrary point. */
@@ -146,7 +188,7 @@ export function warpAreas(
   height: number,
 ): string | null {
   if (areas.length === 0) return null;
-  const controls = buildControls(lm, areas);
+  const { controls, movers, scale } = buildControls(lm, areas);
   const power = 2.2;
 
   // Displacement at each grid vertex (the expensive IDW only runs here).
@@ -161,25 +203,41 @@ export function warpAreas(
     }
   }
 
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-  ctx.imageSmoothingQuality = "high";
-
-  // Render each grid cell as two source→dest triangles (piecewise-affine).
+  // The warped image (whole frame goes through the piecewise-affine grid).
+  const warped = document.createElement("canvas");
+  warped.width = width;
+  warped.height = height;
+  const wctx = warped.getContext("2d");
+  if (!wctx) return null;
+  wctx.imageSmoothingQuality = "high";
   const at = (r: number, c: number): Pt => ({ x: (c / GRID) * width, y: (r / GRID) * height });
   for (let r = 0; r < GRID; r++) {
     for (let c = 0; c < GRID; c++) {
       const s00 = at(r, c), s10 = at(r, c + 1), s01 = at(r + 1, c), s11 = at(r + 1, c + 1);
       const d00 = dst[r * cols + c], d10 = dst[r * cols + c + 1];
       const d01 = dst[(r + 1) * cols + c], d11 = dst[(r + 1) * cols + c + 1];
-      drawTri(ctx, img, [s00, s10, s11], [d00, d10, d11]);
-      drawTri(ctx, img, [s00, s11, s01], [d00, d11, d01]);
+      drawTri(wctx, img, [s00, s10, s11], [d00, d10, d11]);
+      drawTri(wctx, img, [s00, s11, s01], [d00, d11, d01]);
     }
   }
-  return canvas.toDataURL("image/png");
+
+  // Identity lock: keep the warp only over the projection region, paste it onto
+  // the ORIGINAL photo. Everything outside the feathered mask is the patient's
+  // exact original pixels — no global resample of eyes/hair/background.
+  const mask = regionMask(movers, scale, width, height);
+  const masked = warped.getContext("2d")!; // reuse: keep warped ∩ mask
+  masked.globalCompositeOperation = "destination-in";
+  masked.drawImage(mask, 0, 0);
+  masked.globalCompositeOperation = "source-over";
+
+  const out = document.createElement("canvas");
+  out.width = width;
+  out.height = height;
+  const octx = out.getContext("2d");
+  if (!octx) return null;
+  octx.drawImage(img, 0, 0, width, height); // original
+  octx.drawImage(warped, 0, 0); // warped region on top
+  return out.toDataURL("image/png");
 }
 
 function drawTri(

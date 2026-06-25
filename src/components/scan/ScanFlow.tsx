@@ -233,7 +233,7 @@ export function ScanFlow() {
       // patient may have toggled one off while we were detecting).
       profileWarpRef.current = { img, lm: det.landmarks, width: w, height: h };
       profileAreasRef.current = areas;
-      recomposeProfile(selectedRef.current);
+      if (!recomposeProfile(selectedRef.current)) setProfileFailed(true);
     } catch {
       if (gen === genId.current) setProfileFailed(true);
     } finally {
@@ -244,16 +244,20 @@ export function ScanFlow() {
   // Re-warp the profile down to the selected projection areas (chin / jaw / nose)
   // — a free, deterministic, on-device op. If no projection area is selected the
   // profile preview drops away (it exists only to show projection).
-  function recomposeProfile(sel: Set<string>) {
+  function recomposeProfile(sel: Set<string>): boolean {
     const src = profileWarpRef.current;
-    if (!src) return;
+    if (!src) return false;
     const picked = profileAreasRef.current.filter((a) => sel.has(a));
     if (picked.length === 0) {
       setProfileSrc(null);
-      return;
+      return true; // nothing selected is a valid (empty) state, not a failure
     }
     const dataUrl = warpAreas(src.img, src.lm, picked, src.width, src.height);
-    if (dataUrl) setProfileSrc(dataUrl);
+    if (dataUrl) {
+      setProfileSrc(dataUrl);
+      return true;
+    }
+    return false;
   }
 
   async function analyze(images: CapturedImage[]) {
