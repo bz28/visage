@@ -15,6 +15,10 @@ export function paintAreaRegion(
   h: number,
   color: string,
 ) {
+  // `dilate` (and the per-area lineWidth/ellipse multipliers below) are
+  // empirically-tuned feather/overshoot factors — the mask must cover a bit
+  // beyond the landmark contour so it spans where filler actually lands. Tuned
+  // by eye on real faces, not from clinical data.
   const dilate = Math.max(6, Math.hypot(w, h) * 0.012);
   ctx.save();
   ctx.fillStyle = color;

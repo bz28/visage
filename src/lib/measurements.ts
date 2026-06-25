@@ -67,8 +67,12 @@ export function computeMeasurements(lm: Pt[]): Measurements {
   const frontalTilt =
     Math.abs(rightHalf - leftHalf) / ((rightHalf + leftHalf) / 2 || 1);
 
+  // The verdict cut-offs below are CLINICAL — textbook ideals with placeholder
+  // flag-bands, pending surgeon review (docs/surgeon-calibration.md). Keep the
+  // ideals in sync with the targets quoted in ai.ts's prompt.
   return {
     thirds: { upper, middle, lower },
+    // Ideal ~0.33 (equal thirds). Below ~0.30 reads short; above ~0.36 long.
     lowerThird:
       lower > 0.36 ? "long" : lower < 0.3 ? "short" : "balanced",
     lipRatio,
@@ -76,6 +80,7 @@ export function computeMeasurements(lm: Pt[]): Measurements {
     lipVerdict: lipRatio < 1.3 ? "short" : lipRatio > 2.0 ? "long" : "balanced",
     lowerFaceRatio,
     jawToCheek,
+    // Balanced ~0.70–0.75. Below ~0.68 reads narrow; above ~0.80 wide.
     jawVerdict:
       jawToCheek < 0.68 ? "narrow" : jawToCheek > 0.8 ? "wide" : "balanced",
     asymmetry,

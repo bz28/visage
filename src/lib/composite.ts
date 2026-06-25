@@ -33,6 +33,8 @@ export function mouthOpenness(lm: Pt[]): number {
 
 /** Is the mouth open / teeth likely showing in this face? */
 export function isMouthOpen(lm: Pt[]): boolean {
+  // 0.04 ≈ a lip gap of ~4% of the inter-eye distance — empirically about where
+  // teeth start to show. A CV tuning (not a clinical value).
   return mouthOpenness(lm) > 0.04;
 }
 
@@ -72,7 +74,8 @@ export async function compositeAreas(
   const genLm = det.landmarks;
 
   // Verify: if lips are edited, the mouth must not have opened/closed (the one
-  // thing the composite can't fix, since the lip region IS the mouth).
+  // thing the composite can't fix, since the lip region IS the mouth). 0.05 ≈ a
+  // 5%-of-eye-distance change in lip gap — a CV tolerance for "expression held".
   if (areas.includes("lips")) {
     const openO = mouthOpenness(originalLm);
     const openG = mouthOpenness(genLm);

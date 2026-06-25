@@ -67,9 +67,10 @@ export function baselineAssessment(
   }
 
   // --- Symmetry (informational, never alarmist) ---
-  // PLACEHOLDER: asymmetry is whole-face, but the schema needs a single area, so
-  // it's filed under "chin". Whether asymmetry should be its own area (or which
-  // area should host it) is a surgeon question — see docs/surgeon-calibration.md.
+  // CLINICAL: 0.08 is the asymmetry index above which we surface this to the
+  // patient — a placeholder threshold pending surgeon review (docs). Schema note:
+  // asymmetry is whole-face but we file it under "chin" since the schema needs
+  // one area; whether it deserves its own area is also a surgeon question.
   if (m.asymmetry > 0.08) {
     areas.push({
       area: "chin",
