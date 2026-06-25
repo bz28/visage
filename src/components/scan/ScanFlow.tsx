@@ -204,6 +204,7 @@ export function ScanFlow() {
       const h = img.naturalHeight;
       const det = await detectFace(img, w, h);
       if (det.status !== "ok" || !det.landmarks) return; // no usable profile
+      if (gen !== genId.current) return; // superseded while detecting
       setProfile({ dataUrl, width: w, height: h });
       let composited: string | null = null;
       for (let attempt = 0; attempt < 3 && !composited; attempt++) {
