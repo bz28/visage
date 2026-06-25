@@ -1,5 +1,5 @@
 import { KEY, REGIONS, type Pt } from "./landmarks";
-import type { SimulatableArea } from "./simulation";
+import type { EditableArea } from "./simulation";
 
 /**
  * Paint an area's region onto a canvas as a soft, feathered shape — used to build
@@ -10,7 +10,7 @@ import type { SimulatableArea } from "./simulation";
 export function paintAreaRegion(
   ctx: CanvasRenderingContext2D,
   lm: Pt[],
-  area: SimulatableArea,
+  area: EditableArea,
   w: number,
   h: number,
   color: string,
@@ -84,6 +84,14 @@ export function paintAreaRegion(
       for (const corner of [lm[KEY.mouthCornerR], lm[KEY.mouthCornerL]]) {
         if (corner && menton) band(ctx, corner, lerp(corner, menton, 0.6));
       }
+      break;
+    }
+    case "nose": {
+      // Feathered band down the nose ridge (bridge → tip → base) — covers where
+      // a non-surgical refinement lands; reads in profile, where nose shows.
+      ctx.lineWidth = dilate * 3.5;
+      band(ctx, lm[KEY.nasion], lm[KEY.noseTip]);
+      band(ctx, lm[KEY.noseTip], lm[KEY.subnasale]);
       break;
     }
   }

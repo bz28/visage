@@ -6,7 +6,12 @@ import { computeMeasurements } from "@/lib/measurements";
 import { baselineAssessment } from "@/lib/baseline";
 import { buildAnnotations, type Marker } from "@/lib/annotations";
 import { compositeAreas, isMouthOpen } from "@/lib/composite";
-import { isSimulatable, type SimulatableArea } from "@/lib/simulation";
+import {
+  isSimulatable,
+  isProfileArea,
+  type SimulatableArea,
+  type ProfileArea,
+} from "@/lib/simulation";
 import type { Assessment } from "@/lib/assessment-schema";
 import type { Intake as IntakeData } from "@/lib/intake-schema";
 import type { ViewKey } from "@/lib/views";
@@ -69,6 +74,13 @@ export function ScanFlow() {
   const [combinedLoading, setCombinedLoading] = useState(false);
   const [combinedFailed, setCombinedFailed] = useState(false);
   const [generatedRaw, setGeneratedRaw] = useState<string | null>(null);
+
+  // The optional PROFILE (side-view) before/after — projection areas (chin / jaw
+  // / nose) shown from the side, where their real effect reads. Only when a
+  // usable profile photo was provided; generated once, no toggling.
+  const [profile, setProfile] = useState<Photo | null>(null);
+  const [profileSrc, setProfileSrc] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
   // Areas the patient currently wants included (defaults to all recommended).
   // A ref mirrors it so async paths (a slow generation completing) read the
   // CURRENT selection, not the value captured when they started.
@@ -175,6 +187,55 @@ export function ScanFlow() {
     }
   }
 
+  // Generate the optional profile before/after: detect landmarks on the side
+  // photo, edit the projection areas, composite the regions back. If the side
+  // photo can't be landmarked (a hard profile MediaPipe can't read), we simply
+  // don't show a profile result — the front stands on its own.
+  async function generateProfile(
+    dataUrl: string,
+    areas: ProfileArea[],
+    gen: number,
+  ) {
+    if (areas.length === 0) return;
+    setProfileLoading(true);
+    try {
+      const img = await loadImage(dataUrl);
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      const det = await detectFace(img, w, h);
+      if (det.status !== "ok" || !det.landmarks) return; // no usable profile
+      if (gen !== genId.current) return; // superseded while detecting
+      setProfile({ dataUrl, width: w, height: h });
+      let composited: string | null = null;
+      for (let attempt = 0; attempt < 3 && !composited; attempt++) {
+        const res = await fetch("/api/simulate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ image: dataUrl, profileAreas: areas }),
+        });
+        const data: { image?: string } = await res.json();
+        if (!data.image) break;
+        const result = await compositeAreas(
+          dataUrl,
+          det.landmarks,
+          areas,
+          data.image,
+          w,
+          h,
+        );
+        if (result.ok && result.dataUrl) composited = result.dataUrl;
+        else console.warn(`[profile] rejected, retrying: ${result.reason}`);
+        if (gen !== genId.current) return;
+      }
+      if (gen !== genId.current) return;
+      if (composited) setProfileSrc(composited);
+    } catch {
+      // graceful — no profile result
+    } finally {
+      if (gen === genId.current) setProfileLoading(false);
+    }
+  }
+
   async function analyze(images: CapturedImage[]) {
     setError(null);
     // Remember the shots so a detection error doesn't wipe them.
@@ -245,15 +306,22 @@ export function ScanFlow() {
 
       // Kick off the combined before/after in the background so it's rendering
       // while they read the plan.
-      const simAreas = [
-        ...new Set(assessment.areas.map((a) => a.area)),
-      ].filter(isSimulatable);
+      const gen = ++genId.current;
+      const uniqueAreas = [...new Set(assessment.areas.map((a) => a.area))];
       void generateCombined(
         { dataUrl: frontImg.dataUrl, width: w, height: h },
         landmarks,
-        simAreas,
-        ++genId.current,
+        uniqueAreas.filter(isSimulatable),
+        gen,
       );
+
+      // If a side photo was provided, also generate a profile before/after for
+      // the projection areas (chin / jaw / nose) it covers.
+      const profileImg = images.find((i) => i.view === "profile");
+      const profileAreas = uniqueAreas.filter(isProfileArea);
+      if (profileImg && profileAreas.length > 0) {
+        void generateProfile(profileImg.dataUrl, profileAreas, gen);
+      }
     } catch {
       setError("Something went wrong reading that photo. Please try again.");
       setStep("capture");
@@ -272,6 +340,9 @@ export function ScanFlow() {
     setCombinedFailed(false);
     setCombinedLoading(false);
     setGeneratedRaw(null);
+    setProfile(null);
+    setProfileSrc(null);
+    setProfileLoading(false);
     applySelection(new Set());
     setStep("intake");
   }
@@ -342,25 +413,52 @@ export function ScanFlow() {
               </p>
             </header>
 
-            <BeforeAfter
-              beforeSrc={front.dataUrl}
-              afterSrc={combinedSrc}
-              imageWidth={front.width}
-              imageHeight={front.height}
-              markers={analysis.markers.filter((m) => selected.has(m.area))}
-              highlightedArea={highlightedArea}
-              onPinClick={(area) =>
-                setHighlightedArea((cur) => (cur === area ? null : area))
-              }
-              loading={combinedLoading}
-              placeholder={
-                combinedFailed
-                  ? "Preview unavailable — your read still stands."
-                  : ![...selected].some(isSimulatable)
-                    ? "Switch an area on below to see your preview."
-                    : undefined
-              }
-            />
+            {/* Front before/after (the hero). Labelled "Front" only when a
+                profile result is also shown below. */}
+            <div className="flex flex-col gap-2">
+              {profile && (profileSrc || profileLoading) && (
+                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                  Front
+                </p>
+              )}
+              <BeforeAfter
+                beforeSrc={front.dataUrl}
+                afterSrc={combinedSrc}
+                imageWidth={front.width}
+                imageHeight={front.height}
+                markers={analysis.markers.filter((m) => selected.has(m.area))}
+                highlightedArea={highlightedArea}
+                onPinClick={(area) =>
+                  setHighlightedArea((cur) => (cur === area ? null : area))
+                }
+                loading={combinedLoading}
+                placeholder={
+                  combinedFailed
+                    ? "Preview unavailable — your read still stands."
+                    : ![...selected].some(isSimulatable)
+                      ? "Switch an area on below to see your preview."
+                      : undefined
+                }
+              />
+            </div>
+
+            {/* Profile before/after — only when a usable side photo was given.
+                Shows projection (chin / jaw / nose) the front can't. */}
+            {profile && (profileSrc || profileLoading) && (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                  Profile
+                </p>
+                <BeforeAfter
+                  beforeSrc={profile.dataUrl}
+                  afterSrc={profileSrc}
+                  imageWidth={profile.width}
+                  imageHeight={profile.height}
+                  markers={[]}
+                  loading={profileLoading}
+                />
+              </div>
+            )}
 
             <AssessmentResult
               assessment={analysis.assessment}
