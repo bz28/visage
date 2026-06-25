@@ -40,8 +40,11 @@ export function lookFromGender(gender: Gender | undefined): Look | undefined {
   return undefined;
 }
 
-// --- Reserved for the AI read / the future clinician tool. NOT collected in the
-//     simplified patient intake. ---
+// --- RESERVED for the future clinician tool — intentionally kept, not dead. ---
+// These option sets + the schema fields below (goals, budget) are NOT collected
+// in the patient flow and NOT yet read anywhere (unlike `heritage`/
+// `priorTreatments`, which the AI read does use). They're the richer intake the
+// clinician tool will collect; keep until that's built.
 export const GOAL_OPTIONS = [
   "Fuller lips",
   "Sharper jawline",

@@ -36,11 +36,13 @@ export function computeMeasurements(lm: Pt[]): Measurements {
   const lowerLipH = vdist(p(KEY.stomionLower), p(KEY.lowerLipBottom));
   const lipRatio = lowerLipH / upperLipH;
 
-  // Lower-face split: nose-base→mouth vs mouth→chin.
+  // Lower-face vertical proportion: nose-base→mouth vs mouth→chin. CANDIDATE
+  // metric — computed but not yet used in the read; pending surgeon input on
+  // whether lower-face proportion is worth flagging and its ideal (docs §1).
   const stomionY = (p(KEY.stomionUpper).y + p(KEY.stomionLower).y) / 2;
   const snToMouth = Math.abs(stomionY - p(KEY.subnasale).y) || 1;
   const mouthToChin = Math.abs(p(KEY.menton).y - stomionY);
-  const upperToLowerLip = snToMouth / (mouthToChin || 1);
+  const lowerFaceRatio = snToMouth / (mouthToChin || 1);
 
   // --- Jaw vs cheek width ---
   const cheekW = dist(p(KEY.zygionR), p(KEY.zygionL)) || 1;
@@ -72,7 +74,7 @@ export function computeMeasurements(lm: Pt[]): Measurements {
     lipRatio,
     // Ideal lower:upper ≈ 1.6. Below ~1.3 reads thin; above ~2.0 bottom-heavy.
     lipVerdict: lipRatio < 1.3 ? "short" : lipRatio > 2.0 ? "long" : "balanced",
-    upperToLowerLip,
+    lowerFaceRatio,
     jawToCheek,
     jawVerdict:
       jawToCheek < 0.68 ? "narrow" : jawToCheek > 0.8 ? "wide" : "balanced",

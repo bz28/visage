@@ -13,7 +13,6 @@ export const verdictSchema = z.enum([
   "narrow",
   "wide",
 ]);
-export type Verdict = z.infer<typeof verdictSchema>;
 
 export const measurementsSchema = z.object({
   thirds: z.object({
@@ -24,7 +23,8 @@ export const measurementsSchema = z.object({
   lowerThird: verdictSchema,
   lipRatio: z.number(),
   lipVerdict: verdictSchema,
-  upperToLowerLip: z.number(),
+  /** Candidate metric, not yet used in the read — see measurements.ts. */
+  lowerFaceRatio: z.number(),
   jawToCheek: z.number(),
   jawVerdict: verdictSchema,
   asymmetry: z.number(),

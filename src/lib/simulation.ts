@@ -1,10 +1,11 @@
 /**
  * The three filler intensities (a label + how-much wording).
  *
- * NOTE: the patient flow shows ONE optimal result (the Natural amount) — see
- * `buildCombinedPrompt`. The Subtle/Natural/Fuller selector and per-area editing
- * (`buildPrompt`) power the upcoming **clinician tool**, where the injector
- * dials each area; they're kept here for that, not used in the patient UI.
+ * NOTE: the patient flow shows ONE optimal result — a qualitative "natural"
+ * level (see `buildCombinedPrompt`), NOT tied to the mL table below. The
+ * Subtle/Natural/Fuller selector and per-area amounts (`buildPrompt`,
+ * `AREA_AMOUNTS`) power the upcoming **clinician tool**, where the injector dials
+ * each area; they're kept here for that, not used in the patient UI.
  */
 export const LOOK_KEYS = ["subtle", "natural", "fuller"] as const;
 export type LookKey = (typeof LOOK_KEYS)[number];
@@ -15,6 +16,7 @@ export const LOOKS: { key: LookKey; label: string; degree: string }[] = [
   { key: "fuller", label: "Fuller", degree: "noticeably but still tastefully" },
 ];
 
+// Reserved for the clinician tool's look selector (not used in the patient flow).
 export const DEFAULT_LOOK: LookKey = "natural";
 
 /**
