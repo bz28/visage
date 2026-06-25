@@ -65,5 +65,20 @@ profile?
   but is that the right clinical lean, and what should each direction *treat*?
 - Tailoring by **age / goal** — a couple of concrete examples?
 
+## Profile projection — how *much* (the warp)
+
+The profile before/after is now a geometric **warp** (we move the patient's own
+pixels forward, calibrated to mm — no AI). The amount per area is my best-guess
+placeholder, as a fraction of **face height** (`src/lib/warp.ts`, `AREA_WARP`).
+We need real numbers from you:
+
+- **Chin** projection — a *natural* (≈1 mL) forward projection is what % of face
+  height, roughly? (placeholder ~5%)
+- **Jawline / pre-jowl** — how far out to define the angle? (placeholder ~3.8%)
+- **Nose** (non-surgical) — dorsum/tip refinement, kept smallest? (placeholder ~2.2%)
+- Where does each start to look **overdone** in profile?
+- Per-area **direction** — we push forward along the face's sagittal axis; is
+  that right, or should chin drop / jaw flare more?
+
 *Fix what's wrong, ignore what's fine. Code pointers live next to each value if
 you want them.*

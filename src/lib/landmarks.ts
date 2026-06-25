@@ -10,6 +10,10 @@ const MODEL_URL =
 export interface Pt {
   x: number;
   y: number;
+  /** Relative depth from MediaPipe (≈ same scale as x; smaller = nearer the
+   *  camera). Present on detected landmarks; absent on derived 2D points. Used
+   *  by the warp engine to know the face's 3D surface direction. */
+  z?: number;
 }
 
 export type DetectStatus = "ok" | "no-face" | "multiple-faces";
@@ -104,6 +108,9 @@ export async function detectFace(
   const landmarks: Pt[] = faces[0].map((p) => ({
     x: p.x * width,
     y: p.y * height,
+    // MediaPipe's z is normalized roughly to image width — scale it like x so
+    // depth is comparable to the pixel-space x/y.
+    z: p.z * width,
   }));
   return { status: "ok", landmarks };
 }
