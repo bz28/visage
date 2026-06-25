@@ -3,6 +3,7 @@
 import type { Assessment } from "@/lib/assessment-schema";
 import { AREA_LABELS, DISCLAIMER } from "@/lib/assessment-schema";
 import { CLINIC } from "@/lib/clinic";
+import { Button } from "@/components/ui/Button";
 
 interface Props {
   assessment: Assessment;
@@ -49,20 +50,22 @@ export function AssessmentResult({
             )}
           </div>
           <ul className="flex flex-col gap-3">
-            {uniqueAreas.map((a) => {
+            {uniqueAreas.map((a, i) => {
               const on = selected.has(a.area);
               const label = AREA_LABELS[a.area];
               return (
                 // Hover / tap / keyboard-focus highlights this area's pin on the
-                // photo (focus bubbles up from the switch inside).
+                // photo (focus bubbles up from the switch inside). Staggered
+                // entrance so the plan settles in rather than snapping.
                 <li
                   key={a.area}
+                  style={{ animationDelay: `${i * 55}ms` }}
                   onMouseEnter={() => onHighlight(a.area)}
                   onMouseLeave={() => onHighlight(null)}
                   onClick={() => onHighlight(a.area)}
                   onFocus={() => onHighlight(a.area)}
                   onBlur={() => onHighlight(null)}
-                  className={`flex items-start justify-between gap-3 rounded-2xl border p-4 transition-colors ${
+                  className={`animate-rise flex items-start justify-between gap-3 rounded-2xl border p-4 transition-colors ${
                     on
                       ? "border-border bg-surface hover:border-ink-300"
                       : "border-dashed border-ink-300 bg-transparent"
@@ -91,12 +94,9 @@ export function AssessmentResult({
       <p className="text-xs leading-relaxed text-ink-400">{DISCLAIMER}</p>
 
       <div className="z-10 flex flex-col gap-2.5 rounded-2xl border border-border bg-surface/95 p-3 shadow-lg backdrop-blur md:sticky md:bottom-4">
-        <button
-          onClick={onBook}
-          className="rounded-full bg-foreground px-7 py-3.5 font-medium text-background transition-transform active:scale-[0.99]"
-        >
+        <Button onClick={onBook} className="px-7 py-3.5">
           Book a consultation
-        </button>
+        </Button>
         <p className="flex items-center justify-center gap-1.5 text-center text-xs text-ink-500">
           <svg
             viewBox="0 0 24 24"

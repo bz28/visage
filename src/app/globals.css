@@ -76,8 +76,25 @@ body {
   animation: scan-sweep 2.6s ease-in-out infinite;
 }
 
+/* Gentle entrance for each step / staggered list items — a translateY+fade with
+   a soft, slightly-overshooting ease so the flow feels considered, not static. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-rise {
+  animation: rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .scan-sweep {
+  .scan-sweep,
+  .animate-rise {
     animation: none;
   }
 }

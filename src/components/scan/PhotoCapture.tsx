@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ViewKey } from "@/lib/views";
 import { checkPhoto, warningMessage } from "@/lib/photo-check";
 import { PoseIllustration } from "./PoseIllustration";
+import { Button } from "@/components/ui/Button";
 
 interface Props {
   view: ViewKey;
@@ -140,21 +141,22 @@ export function PhotoCapture({
           {pending.message}
         </p>
         <div className="flex flex-col gap-3 sm:flex-row">
-          <button
+          <Button
             onClick={() => {
               setPending(null);
               setMode("choose");
             }}
-            className="rounded-full bg-foreground px-7 py-3 font-medium text-background"
+            className="px-7 py-3"
           >
             Retake
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
             onClick={() => onCapture(pending.dataUrl)}
-            className="rounded-full border border-ink-300 px-7 py-3 font-medium"
+            className="px-7 py-3"
           >
             Use anyway
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -202,22 +204,20 @@ export function PhotoCapture({
         </div>
         <div className="flex gap-3">
           {onCancel && (
-            <button
+            <Button
+              variant="ghost"
               onClick={() => {
                 streamRef.current?.getTracks().forEach((t) => t.stop());
                 onCancel();
               }}
-              className="rounded-full border border-ink-300 px-6 py-3 font-medium"
+              className="px-6 py-3"
             >
               Back
-            </button>
+            </Button>
           )}
-          <button
-            onClick={snap}
-            className="rounded-full bg-foreground px-8 py-3 font-medium text-background"
-          >
+          <Button onClick={snap} className="px-8 py-3">
             Take photo
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -239,18 +239,16 @@ export function PhotoCapture({
         </p>
       </div>
       <div className="flex flex-col gap-3 sm:flex-row">
-        <button
-          onClick={startCamera}
-          className="rounded-full bg-foreground px-7 py-3 font-medium text-background"
-        >
+        <Button onClick={startCamera} className="px-7 py-3">
           Use camera
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
           onClick={() => fileRef.current?.click()}
-          className="rounded-full border border-ink-300 px-7 py-3 font-medium"
+          className="px-7 py-3"
         >
           Upload a photo
-        </button>
+        </Button>
       </div>
       {onCancel && (
         <button onClick={onCancel} className="text-sm text-ink-400 underline">

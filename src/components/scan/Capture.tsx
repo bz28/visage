@@ -4,6 +4,7 @@ import { useState } from "react";
 import { VIEWS, type ViewKey } from "@/lib/views";
 import { PhotoCapture } from "./PhotoCapture";
 import { PoseIllustration } from "./PoseIllustration";
+import { Button } from "@/components/ui/Button";
 
 export interface CapturedImage {
   view: ViewKey;
@@ -149,13 +150,9 @@ export function Capture({ initialPhotos, concern = "", onDone }: Props) {
         })}
       </div>
 
-      <button
-        onClick={done}
-        disabled={!photos.front}
-        className="rounded-full bg-foreground px-7 py-3 font-medium text-background disabled:opacity-40"
-      >
+      <Button onClick={done} disabled={!photos.front} className="px-7 py-3">
         See my read
-      </button>
+      </Button>
       <p className="text-center text-xs text-ink-400">
         We use your photos only to create your result — we don&apos;t store
         them.
