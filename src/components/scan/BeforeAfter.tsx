@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { Marker } from "@/lib/annotations";
 import { AREA_LABELS } from "@/lib/assessment-schema";
 
@@ -16,17 +16,16 @@ interface Props {
   /** Tapping a dot on the photo highlights that area (reveals its label). */
   onPinClick?: (area: string) => void;
   loading: boolean;
-  /** Shown over the photo when there's no "after" and we're not loading. */
+  /** Shown in the right panel when there's no "after" and we're not loading. */
   placeholder?: string;
 }
 
-type Mode = "slider" | "side";
-
 /**
- * The hero before/after. Defaults to side-by-side (both photos at once); a
- * toggle switches to a drag-to-reveal slider (the divider wipes open when the
- * result lands). The "now" photo carries pin + label markers. Everything is plain
- * <img> + positioned HTML so the labels stay crisp and never obscure the face.
+ * The hero before/after — Now | With treatment, side by side. The "now" photo
+ * carries pin + label markers; tapping a dot (or a plan row) reveals its label.
+ * The right panel shows a ghost (skeleton + status) until the result lands, so
+ * the two-up layout doesn't jump in. Plain <img> + positioned HTML so labels
+ * stay crisp and never obscure the face.
  */
 export function BeforeAfter({
   beforeSrc,
@@ -39,194 +38,55 @@ export function BeforeAfter({
   loading,
   placeholder,
 }: Props) {
-  // Default to side-by-side (the surgeon's explicit ask + immediately legible);
-  // the slider is the interactive enhancement behind the toggle.
-  const [mode, setMode] = useState<Mode>("side");
-  const [split, setSplit] = useState(100); // start fully on "now"
-  // `isDragging` drives the render (transition on/off); `draggingRef` is read
-  // synchronously inside pointer handlers so no move events are missed.
-  const [isDragging, setIsDragging] = useState(false);
-  const draggingRef = useRef(false);
-  const revealedRef = useRef(false); // wipe-reveal happens once, on first result
-  const frameRef = useRef<HTMLDivElement>(null);
-
-  const setDrag = (v: boolean) => {
-    draggingRef.current = v;
-    setIsDragging(v);
-  };
-
-  // Fired when the "after" image finishes loading: the first time, wipe the
-  // divider open to reveal it (later re-composites from toggling keep the user's
-  // slider position).
-  function onAfterReady() {
-    if (!revealedRef.current) {
-      revealedRef.current = true;
-      setSplit(55);
-    }
-  }
-
-  function moveTo(clientX: number) {
-    const rect = frameRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const pct = ((clientX - rect.left) / rect.width) * 100;
-    setSplit(Math.max(0, Math.min(100, pct)));
-  }
-
   const showAfter = !!afterSrc;
-  const sliderMode = mode === "slider" && showAfter;
-  // Side-by-side shows two full photos, so the frame is twice as wide — that
-  // keeps each column at the photo's own aspect (object-cover doesn't crop, pins
-  // line up). It's wide whenever side mode is active, even while the "after" is
-  // still generating, so the two-up layout doesn't jump in when it lands.
-  const aspect =
-    mode === "side"
-      ? `${imageWidth * 2} / ${imageHeight}`
-      : `${imageWidth} / ${imageHeight}`;
-  // With no "after", the before must fill the frame regardless of slider state.
-  const effSplit = showAfter ? split : 100;
+  // Two full photos side by side → the frame is twice as wide, so each column
+  // keeps the photo's own aspect (object-cover doesn't crop, pins line up).
+  const aspect = `${imageWidth * 2} / ${imageHeight}`;
 
   return (
-    <div className="flex flex-col gap-3">
-      <div
-        ref={frameRef}
-        className="relative mx-auto w-full max-w-2xl select-none overflow-hidden rounded-3xl bg-neutral-100 shadow-lg ring-1 ring-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--accent)]"
-        style={{ aspectRatio: aspect }}
-        {...(sliderMode && {
-          role: "slider" as const,
-          tabIndex: 0,
-          "aria-label": "Drag to compare before and after",
-          "aria-valuemin": 0,
-          "aria-valuemax": 100,
-          "aria-valuenow": Math.round(effSplit),
-          onKeyDown: (e: React.KeyboardEvent) => {
-            if (e.key === "ArrowLeft") setSplit((s) => Math.max(0, s - 4));
-            else if (e.key === "ArrowRight") setSplit((s) => Math.min(100, s + 4));
-          },
-        })}
-        onPointerDown={
-          sliderMode
-            ? (e) => {
-                setDrag(true);
-                try {
-                  e.currentTarget.setPointerCapture(e.pointerId);
-                } catch {
-                  // pointer may no longer be active — capture is best-effort
-                }
-                moveTo(e.clientX);
-              }
-            : undefined
-        }
-        onPointerMove={(e) => draggingRef.current && moveTo(e.clientX)}
-        onPointerUp={() => setDrag(false)}
-        onPointerCancel={() => setDrag(false)}
-        onLostPointerCapture={() => setDrag(false)}
-      >
-        {mode === "side" ? (
-          // Side-by-side: now | with treatment. The right panel shows a ghost
-          // (skeleton + status) until the "after" is ready, so the layout is
-          // set from the start.
-          <div className="grid size-full grid-cols-2">
-            <div className="relative overflow-hidden border-r border-white/60">
-              <Photo src={beforeSrc} />
-              <Pins markers={markers} imageWidth={imageWidth} imageHeight={imageHeight} highlightedArea={highlightedArea} interactive onPinClick={onPinClick} />
-              <Caption side="left">Now</Caption>
-            </div>
-            <div className="relative overflow-hidden bg-neutral-100">
-              {showAfter ? (
-                <>
-                  <Photo src={afterSrc} alt="Simulated result with the recommended treatment" reveal onReady={onAfterReady} />
-                  <Badge />
-                </>
-              ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 px-3 text-center">
-                  {loading ? (
-                    <>
-                      <span className="size-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
-                      <span className="text-xs text-neutral-500">Creating your preview…</span>
-                    </>
-                  ) : (
-                    <span className="text-xs text-neutral-400">{placeholder}</span>
-                  )}
-                </div>
-              )}
-              <Caption side="right" accent>
-                With treatment
-              </Caption>
-            </div>
-          </div>
-        ) : (
-          // Slider (or before-only while loading): after underneath, now on top
-          // clipped to the divider.
-          <>
-            {showAfter && <Photo src={afterSrc} alt="Simulated result with the recommended treatment" reveal onReady={onAfterReady} />}
-            {showAfter && <Badge />}
-            <div
-              className="absolute inset-0"
-              style={{
-                clipPath: `inset(0 ${100 - effSplit}% 0 0)`,
-                transition: isDragging ? "none" : "clip-path 0.7s cubic-bezier(0.4,0,0.2,1)",
-              }}
-            >
-              <Photo src={beforeSrc} />
-              <Pins markers={markers} imageWidth={imageWidth} imageHeight={imageHeight} highlightedArea={highlightedArea} />
-            </div>
-
-            {showAfter && (
-              <>
-                <Caption side="left">Now</Caption>
-                <Caption side="right" accent>
-                  With treatment
-                </Caption>
-                {/* Divider + handle */}
-                <div
-                  className="pointer-events-none absolute inset-y-0"
-                  style={{
-                    left: `${effSplit}%`,
-                    transition: isDragging ? "none" : "left 0.7s cubic-bezier(0.4,0,0.2,1)",
-                  }}
-                >
-                  <div className="absolute inset-y-0 -ml-px w-0.5 bg-white/90 shadow" />
-                  <div className="absolute top-1/2 -ml-4 -mt-4 flex size-8 items-center justify-center rounded-full bg-white text-neutral-700 shadow-md ring-1 ring-black/5">
-                    <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7 4 12l4 5M16 7l4 5-4 5" />
-                    </svg>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Loading / placeholder overlays (no "after" yet) */}
-            {!showAfter && (loading || placeholder) && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 bg-black/30 text-center backdrop-blur-[1px]">
-                {loading ? (
-                  <>
-                    <span className="size-6 animate-spin rounded-full border-2 border-white/80 border-t-transparent" />
-                    <span className="px-4 text-sm font-medium text-white drop-shadow">
-                      Creating your preview…
-                    </span>
-                  </>
-                ) : (
-                  <span className="px-6 text-sm font-medium text-white drop-shadow">
-                    {placeholder}
-                  </span>
-                )}
-              </div>
-            )}
-          </>
-        )}
+    <div
+      className="mx-auto grid w-full max-w-2xl grid-cols-2 overflow-hidden rounded-3xl bg-neutral-100 shadow-lg ring-1 ring-black/5"
+      style={{ aspectRatio: aspect }}
+    >
+      <div className="relative overflow-hidden border-r border-white/60">
+        <Photo src={beforeSrc} />
+        <Pins
+          markers={markers}
+          imageWidth={imageWidth}
+          imageHeight={imageHeight}
+          highlightedArea={highlightedArea}
+          onPinClick={onPinClick}
+        />
+        <Caption side="left">Now</Caption>
       </div>
-
-      {/* Mode toggle (only once there's something to compare) */}
-      {showAfter && (
-        <div className="mx-auto flex items-center gap-1 rounded-full bg-neutral-100 p-1 text-sm">
-          <ModeButton active={mode === "slider"} onClick={() => setMode("slider")}>
-            Slider
-          </ModeButton>
-          <ModeButton active={mode === "side"} onClick={() => setMode("side")}>
-            Side by side
-          </ModeButton>
-        </div>
-      )}
+      <div className="relative overflow-hidden bg-neutral-100">
+        {showAfter ? (
+          <>
+            <Photo
+              src={afterSrc}
+              alt="Simulated result with the recommended treatment"
+              reveal
+            />
+            <Badge />
+          </>
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 px-3 text-center">
+            {loading ? (
+              <>
+                <span className="size-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+                <span className="text-xs text-neutral-500">
+                  Creating your preview…
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-neutral-400">{placeholder}</span>
+            )}
+          </div>
+        )}
+        <Caption side="right" accent>
+          With treatment
+        </Caption>
+      </div>
     </div>
   );
 }
@@ -235,12 +95,10 @@ function Photo({
   src,
   alt = "",
   reveal,
-  onReady,
 }: {
   src: string;
   alt?: string;
   reveal?: boolean;
-  onReady?: () => void;
 }) {
   const [loaded, setLoaded] = useState(false);
   return (
@@ -249,10 +107,7 @@ function Photo({
       src={src}
       alt={alt}
       draggable={false}
-      onLoad={() => {
-        setLoaded(true);
-        onReady?.();
-      }}
+      onLoad={() => setLoaded(true)}
       className={`absolute inset-0 size-full object-cover transition-opacity duration-500 ${
         reveal && !loaded ? "opacity-0" : "opacity-100"
       }`}
@@ -265,15 +120,12 @@ function Pins({
   imageWidth,
   imageHeight,
   highlightedArea,
-  interactive,
   onPinClick,
 }: {
   markers: Marker[];
   imageWidth: number;
   imageHeight: number;
   highlightedArea?: string | null;
-  /** Side-by-side mode (no drag) → dots are tappable to reveal their label. */
-  interactive?: boolean;
   onPinClick?: (area: string) => void;
 }) {
   // Only dim siblings when the highlighted area is actually shown as a pin (it
@@ -300,14 +152,11 @@ function Pins({
               top: `${(m.point.y / imageHeight) * 100}%`,
             }}
           >
-            {interactive && onPinClick ? (
+            {onPinClick ? (
               <button
                 type="button"
                 aria-label={label}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPinClick(m.area);
-                }}
+                onClick={() => onPinClick(m.area)}
                 className="pointer-events-auto flex size-6 items-center justify-center"
               >
                 <span className={dotClass(hi)} />
@@ -353,26 +202,5 @@ function Caption({
     >
       {children}
     </span>
-  );
-}
-
-function ModeButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-full px-4 py-1.5 font-medium transition-colors ${
-        active ? "bg-white text-foreground shadow-sm" : "text-neutral-500 hover:text-neutral-700"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
