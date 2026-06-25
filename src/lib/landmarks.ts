@@ -45,14 +45,18 @@ export const KEY = {
   eyeOuterR: 33,
   eyeInnerL: 362,
   eyeOuterL: 263,
-  alarR: 48, // right nostril edge (nose width)
-  alarL: 278, // left nostril edge
+  alarR: 48, // right nostril edge (nasolabial-fold start)
+  alarL: 278, // left nostril edge (nasolabial-fold start)
   irisR: 468, // right iris center
   irisL: 473, // left iris center
   templeL: 251, // left temple (upper-side of forehead)
 } as const;
 
-/** Outer lip contour, for drawing the lip annotation marker. */
+/**
+ * Multi-point contours used for annotation marker centroids (annotations.ts) and
+ * the feathered composite region masks (face-regions.ts) — outer lip, jawline,
+ * and the two cheeks.
+ */
 export const REGIONS = {
   outerLip: [
     61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0,
