@@ -1,5 +1,6 @@
 import { detectFace, KEY, type Pt } from "./landmarks";
 import { paintAreaRegion } from "./face-regions";
+import { loadImage } from "./image";
 import type { EditableArea } from "./simulation";
 
 /**
@@ -31,15 +32,6 @@ export function isMouthOpen(lm: Pt[]): boolean {
   // 0.04 ≈ a lip gap of ~4% of the inter-eye distance — empirically about where
   // teeth start to show. A CV tuning (not a clinical value).
   return mouthOpenness(lm) > 0.04;
-}
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
 }
 
 /**

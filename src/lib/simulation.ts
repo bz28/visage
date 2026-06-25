@@ -60,8 +60,9 @@ export function isSimulatable(area: string): area is SimulatableArea {
 /**
  * Areas we can simulate from a PROFILE photo — projection treatments whose real
  * effect shows from the side. Nose graduates from discuss-only (front) to
- * simulatable here. CLINICAL assumptions — the directions in AREA_EDIT_PROFILE
- * are pending surgeon review (docs/surgeon-calibration.md).
+ * simulatable here. These now drive the deterministic geometric warp
+ * (src/lib/warp.ts), not a prompt; the magnitudes are the CLINICAL placeholders
+ * pending surgeon review (docs/surgeon-calibration.md, warp section).
  */
 export const PROFILE_AREAS = ["chin", "jawline", "nose"] as const;
 export type ProfileArea = (typeof PROFILE_AREAS)[number];
@@ -83,16 +84,6 @@ const AREA_EDIT: Record<SimulatableArea, string> = {
     "gently soften the nasolabial folds (the lines from the nose to the mouth corners) with subtle filler support — ease them, do NOT erase them",
   marionette:
     "gently soften the marionette lines (from the mouth corners toward the chin) with subtle filler support and lightly lift the mouth corners — ease them, do NOT flatten the lower face",
-};
-
-// Profile edit directions — projection treatments as they read from the side.
-// Deliberately conservative (filler results read better too-subtle than
-// overdone, and projection edits exaggerate fast on a profile). CLINICAL
-// PLACEHOLDERS pending surgeon review (docs/surgeon-calibration.md).
-const AREA_EDIT_PROFILE: Record<ProfileArea, string> = {
-  chin: "add a very small amount of dermal filler to the chin to project it just slightly forward — a barely-perceptible refinement, NOT a longer, sharper, or more pointed chin",
-  jawline: "add a small amount of dermal filler along the jaw to very slightly clean up the angle and soften the pre-jowl hollow — keep it subtle, do NOT reshape or widen the jaw",
-  nose: "subtly straighten the nasal bridge and gently support the tip with a small amount of filler — a barely-perceptible non-surgical refinement, never a different nose",
 };
 
 // Assert the actual observed mouth state — far stronger than a generic "keep it
@@ -132,21 +123,6 @@ export function buildCombinedPrompt(
     `Keep each change subtle and optimal (about one syringe each). Change ONLY ` +
     `these areas — nothing else. ${mouthRule(areas.includes("lips"), mouthOpen)}` +
     PRESERVE_RULE
-  );
-}
-
-/**
- * The profile combined result: projection areas (chin / jaw / nose) edited from
- * the side, where their real effect shows. No mouth rule (lips aren't a profile
- * area); the composite locks everything outside the treated regions.
- */
-export function buildProfilePrompt(areas: ProfileArea[]): string {
-  const edits = areas.map((a) => AREA_EDIT_PROFILE[a]).join("; ");
-  return (
-    `Edit this profile (side-view) photo to show a NATURAL, subtle dermal-filler ` +
-    `result: ${edits}. Each change must be small and barely perceptible — err on ` +
-    `the side of TOO subtle rather than too much, and never change the overall ` +
-    `face or feature shape. Change ONLY these areas — nothing else. ${PRESERVE_RULE}`
   );
 }
 

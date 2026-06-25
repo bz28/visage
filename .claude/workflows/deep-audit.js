@@ -11,7 +11,7 @@ export const meta = {
 // args = { shards: [{key,label,kind:'vertical'|'thematic',paths:[...],focus?}], verifySkeptics?, emphasis? }
 let cfg = args
 if (typeof cfg === 'string') {
-  try { cfg = JSON.parse(cfg) } catch (e) { cfg = {} }
+  try { cfg = JSON.parse(cfg) } catch { cfg = {} }
 }
 cfg = cfg || {}
 

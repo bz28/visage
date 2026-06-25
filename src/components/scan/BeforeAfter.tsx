@@ -42,7 +42,6 @@ export function BeforeAfter({
   // Press-and-hold the "after" to peek at the original in place — a direct A/B
   // that makes a subtle change legible (recovers what the old slider gave).
   const [comparing, setComparing] = useState(false);
-  // Two full photos side by side → the frame is twice as wide, so each column
   // Each panel keeps the photo's own aspect (object-cover doesn't crop, pins
   // line up). Stacked full-width on phones so faces aren't halved; side-by-side
   // from sm up.

@@ -6,13 +6,10 @@ import { z } from "zod";
  * the request body without dragging the browser-only MediaPipe package into the
  * server bundle. `computeMeasurements` (client-only) lives in measurements.ts.
  */
-export const verdictSchema = z.enum([
-  "balanced",
-  "short",
-  "long",
-  "narrow",
-  "wide",
-]);
+// Verdicts come in two shapes — keep them separate so the schema can't validate
+// an impossible combo (a "wide" lip ratio or a "short" jaw never happen).
+export const sizeVerdict = z.enum(["balanced", "short", "long"]); // thirds, lips
+export const widthVerdict = z.enum(["balanced", "narrow", "wide"]); // jaw
 
 export const measurementsSchema = z.object({
   thirds: z.object({
@@ -20,13 +17,13 @@ export const measurementsSchema = z.object({
     middle: z.number(),
     lower: z.number(),
   }),
-  lowerThird: verdictSchema,
+  lowerThird: sizeVerdict,
   lipRatio: z.number(),
-  lipVerdict: verdictSchema,
+  lipVerdict: sizeVerdict,
   /** Candidate metric, not yet used in the read — see measurements.ts. */
   lowerFaceRatio: z.number(),
   jawToCheek: z.number(),
-  jawVerdict: verdictSchema,
+  jawVerdict: widthVerdict,
   asymmetry: z.number(),
   /** Real-world scale from average interpupillary distance (~63mm). For rough size hints only. */
   mmPerPx: z.number(),
