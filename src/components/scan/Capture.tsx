@@ -18,25 +18,22 @@ interface Props {
   onDone: (images: CapturedImage[]) => void;
 }
 
-// The optional angles read areas the front can't: the SIDE for projection
-// (jaw / chin / nose — how far things sit forward), the ¾ ANGLE for cheek /
-// midface volume. We detect interest from the patient's free text and nudge for
-// the photo that helps. CLINICAL assumption — flagged for surgeon review (docs).
+// The side photo reads what the front can't: projection (jaw / chin / nose — how
+// far things sit forward). We detect interest from the patient's free text and
+// nudge for it. CLINICAL assumption — flagged for surgeon review (docs).
 const VIEW_HINTS: { re: RegExp; view: ViewKey; area: string }[] = [
   { re: /\b(jaw|jawline|jowl)/i, view: "profile", area: "jawline" },
   { re: /\bchins?\b/i, view: "profile", area: "chin" }, // \b both sides so "chinese" doesn't trip it
   { re: /\b(nose|nostril|bridge)/i, view: "profile", area: "nose" },
-  { re: /\bcheeks?\b/i, view: "threequarter", area: "cheeks" },
 ];
 
-// What each optional angle reads best — shown as a STATIC note so anyone curious
-// about those areas knows to add the photo, regardless of what they typed.
+// What the side photo reads best — shown as a STATIC note so anyone curious about
+// those areas knows to add it, regardless of what they typed.
 const VIEW_GOOD_FOR: Partial<Record<ViewKey, string>> = {
   profile: "jawline, chin & nose",
-  threequarter: "cheeks & midface",
 };
 
-// Front is required; side & angle are optional but make the read more accurate.
+// Front is required; the side photo is optional but unlocks the profile preview.
 export function Capture({ initialPhotos, concern = "", onDone }: Props) {
   const [photos, setPhotos] =
     useState<Partial<Record<ViewKey, string>>>(initialPhotos ?? {});
@@ -87,8 +84,8 @@ export function Capture({ initialPhotos, concern = "", onDone }: Props) {
       <div>
         <h2 className="font-display text-xl font-semibold">Your photos</h2>
         <p className="mt-1.5 text-sm leading-relaxed text-neutral-500">
-          The front photo is all we need. Adding a side and angle gives us a
-          sharper, more accurate read.
+          The front photo is all we need. Adding a side photo lets us preview
+          your chin, jaw, and nose from the side too.
         </p>
       </div>
 

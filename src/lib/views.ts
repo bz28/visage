@@ -1,5 +1,5 @@
-// The photo angles a real assessment uses. Front is required; the side and
-// ¾ views are optional but make projection/contour reads far more accurate.
+// The photo angles a real assessment uses. Front is required; the side view is
+// optional but unlocks the profile before/after (chin / jaw / nose projection).
 export const VIEWS = [
   {
     key: "front",
@@ -13,12 +13,6 @@ export const VIEWS = [
     required: false,
     instruction: "Turn to one side — either way.",
   },
-  {
-    key: "threequarter",
-    label: "Angle",
-    required: false,
-    instruction: "Turn about halfway to one side.",
-  },
 ] as const;
 
 export type ViewKey = (typeof VIEWS)[number]["key"];
@@ -26,5 +20,4 @@ export type ViewKey = (typeof VIEWS)[number]["key"];
 export const VIEW_LABELS: Record<ViewKey, string> = {
   front: "Front",
   profile: "Side",
-  threequarter: "Angle",
 };

@@ -181,12 +181,15 @@ async function main() {
     log(`combined before/after rendered (${dims.w}×${dims.h}).`);
 
     // The profile (two-angle) before/after also renders from the side photo.
+    // It runs two composite passes (validate + paint the selection), each a
+    // MediaPipe detect, so it's legitimately slower than the front in headless —
+    // give the waits generous headroom so CI doesn't flake.
     log("waiting for the profile before/after…");
-    await page.getByText("Profile", { exact: true }).waitFor({ timeout: 30_000 });
+    await page.getByText("Profile", { exact: true }).waitFor({ timeout: 45_000 });
     await page.waitForFunction(
       () =>
         document.querySelectorAll('img[alt*="Simulated result"]').length >= 2,
-      { timeout: 60_000 },
+      { timeout: 90_000 },
     );
     log("front + profile before/afters both rendered ✓");
 

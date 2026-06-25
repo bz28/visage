@@ -82,6 +82,15 @@ export function ScanFlow() {
   const [profileSrc, setProfileSrc] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileFailed, setProfileFailed] = useState(false);
+  // The cached profile generation (the raw output that passed the harness, its
+  // landmarks, the photo, and the projection areas it covered) — so toggling a
+  // chin/jaw/nose area re-pastes a subset of the SAME generation, just like the
+  // front. Refs (not state) because the async paths read the current values.
+  const profileRawRef = useRef<string | null>(null);
+  const profileLmRef = useRef<Pt[] | null>(null);
+  const profilePhotoRef = useRef<Photo | null>(null);
+  const profileAreasRef = useRef<ProfileArea[]>([]);
+  const profileRecomposeId = useRef(0);
   // Areas the patient currently wants included (defaults to all recommended).
   // A ref mirrors it so async paths (a slow generation completing) read the
   // CURRENT selection, not the value captured when they started.
@@ -186,6 +195,10 @@ export function ScanFlow() {
     if (front && analysis && generatedRaw) {
       void recompose(next, generatedRaw, genId.current, front, analysis.landmarks);
     }
+    // The profile preview (chin / jaw / nose) re-pastes too — but only when a
+    // projection area was toggled, so a lips/cheeks toggle doesn't needlessly
+    // re-composite (and flicker) the profile panel.
+    if (profileRawRef.current && isProfileArea(area)) void recomposeProfile(next);
   }
 
   // Generate the optional profile before/after: detect landmarks on the side
@@ -207,9 +220,12 @@ export function ScanFlow() {
       const det = await detectFace(img, w, h);
       if (det.status !== "ok" || !det.landmarks) return; // no usable profile
       if (gen !== genId.current) return; // superseded while detecting
-      setProfile({ dataUrl, width: w, height: h });
-      let composited: string | null = null;
-      for (let attempt = 0; attempt < 3 && !composited; attempt++) {
+      const photo: Photo = { dataUrl, width: w, height: h };
+      setProfile(photo);
+      // Generate once (retrying on harness rejection) and cache the raw output
+      // that passes, so toggling re-pastes a subset for free — like the front.
+      let raw: string | null = null;
+      for (let attempt = 0; attempt < 3 && !raw; attempt++) {
         const res = await fetch("/api/simulate", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -225,20 +241,67 @@ export function ScanFlow() {
           w,
           h,
         );
-        if (result.ok && result.dataUrl) composited = result.dataUrl;
+        if (result.ok) raw = data.image;
         else console.warn(`[profile] rejected, retrying: ${result.reason}`);
         if (gen !== genId.current) return;
       }
       if (gen !== genId.current) return;
       // The panel is already mounted (setProfile ran); if generation didn't
-      // produce a result, mark it failed so it shows a note instead of an
+      // produce a usable output, mark it failed so it shows a note instead of an
       // endless spinner that then vanishes.
-      if (composited) setProfileSrc(composited);
-      else setProfileFailed(true);
+      if (raw) {
+        profileRawRef.current = raw;
+        profileLmRef.current = det.landmarks;
+        profilePhotoRef.current = photo;
+        profileAreasRef.current = areas;
+        // Paste for the CURRENT selection (the patient may have toggled a
+        // projection area off while this was generating).
+        await recomposeProfile(selectedRef.current);
+      } else {
+        setProfileFailed(true);
+      }
     } catch {
       if (gen === genId.current) setProfileFailed(true);
     } finally {
       if (gen === genId.current) setProfileLoading(false);
+    }
+  }
+
+  // Profile equivalent of recompose: re-paste the cached profile generation down
+  // to the selected projection areas (chin / jaw / nose). Same free local canvas
+  // op; if no projection area is selected, the profile preview drops away (it
+  // exists only to show projection). Separate from `recompose` rather than a
+  // param-heavy shared helper — the two read different state and stay readable.
+  async function recomposeProfile(sel: Set<string>) {
+    const raw = profileRawRef.current;
+    const lm = profileLmRef.current;
+    const photo = profilePhotoRef.current;
+    if (!raw || !lm || !photo) return;
+    const req = ++profileRecomposeId.current;
+    const gen = genId.current;
+    const live = () => gen === genId.current && req === profileRecomposeId.current;
+    const picked = profileAreasRef.current.filter((a) => sel.has(a));
+    if (picked.length === 0) {
+      if (live()) {
+        setProfileSrc(null);
+        setProfileLoading(false);
+      }
+      return;
+    }
+    setProfileLoading(true);
+    try {
+      const r = await compositeAreas(
+        photo.dataUrl,
+        lm,
+        picked,
+        raw,
+        photo.width,
+        photo.height,
+      );
+      if (!live()) return;
+      if (r.ok && r.dataUrl) setProfileSrc(r.dataUrl);
+    } finally {
+      if (live()) setProfileLoading(false);
     }
   }
 
@@ -353,6 +416,10 @@ export function ScanFlow() {
     setProfileSrc(null);
     setProfileLoading(false);
     setProfileFailed(false);
+    profileRawRef.current = null;
+    profileLmRef.current = null;
+    profilePhotoRef.current = null;
+    profileAreasRef.current = [];
     applySelection(new Set());
     setStep("intake");
   }

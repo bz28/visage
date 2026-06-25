@@ -86,11 +86,13 @@ const AREA_EDIT: Record<SimulatableArea, string> = {
 };
 
 // Profile edit directions — projection treatments as they read from the side.
-// CLINICAL PLACEHOLDERS pending surgeon review (docs/surgeon-calibration.md).
+// Deliberately conservative (filler results read better too-subtle than
+// overdone, and projection edits exaggerate fast on a profile). CLINICAL
+// PLACEHOLDERS pending surgeon review (docs/surgeon-calibration.md).
 const AREA_EDIT_PROFILE: Record<ProfileArea, string> = {
-  chin: "add dermal filler to the chin to project it slightly forward for a more balanced profile",
-  jawline: "add dermal filler along the jaw to sharpen the angle and soften the pre-jowl area",
-  nose: "subtly straighten the nasal bridge, ease any dorsal hump, and gently support the tip — a non-surgical refinement, never a different nose",
+  chin: "add a very small amount of dermal filler to the chin to project it just slightly forward — a barely-perceptible refinement, NOT a longer, sharper, or more pointed chin",
+  jawline: "add a small amount of dermal filler along the jaw to very slightly clean up the angle and soften the pre-jowl hollow — keep it subtle, do NOT reshape or widen the jaw",
+  nose: "subtly straighten the nasal bridge and gently support the tip with a small amount of filler — a barely-perceptible non-surgical refinement, never a different nose",
 };
 
 // Assert the actual observed mouth state — far stronger than a generic "keep it
@@ -141,9 +143,10 @@ export function buildCombinedPrompt(
 export function buildProfilePrompt(areas: ProfileArea[]): string {
   const edits = areas.map((a) => AREA_EDIT_PROFILE[a]).join("; ");
   return (
-    `Edit this profile (side-view) photo to show a natural dermal-filler result: ` +
-    `${edits}. Keep each change subtle and optimal. Change ONLY these areas — ` +
-    `nothing else. ${PRESERVE_RULE}`
+    `Edit this profile (side-view) photo to show a NATURAL, subtle dermal-filler ` +
+    `result: ${edits}. Each change must be small and barely perceptible — err on ` +
+    `the side of TOO subtle rather than too much, and never change the overall ` +
+    `face or feature shape. Change ONLY these areas — nothing else. ${PRESERVE_RULE}`
   );
 }
 
