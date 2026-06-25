@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CLINIC } from "@/lib/clinic";
 import { AREA_LABELS } from "@/lib/assessment-schema";
+import { Button } from "@/components/ui/Button";
 
 interface Props {
   interests: string[];
@@ -134,13 +135,9 @@ export function BookConsult({ interests, onDone }: Props) {
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={status === "saving"}
-        className="rounded-full bg-foreground px-7 py-3.5 font-medium text-background transition-transform active:scale-[0.99] disabled:opacity-50"
-      >
+      <Button type="submit" disabled={status === "saving"} className="px-7 py-3.5">
         {status === "saving" ? "Sending…" : "Request consultation"}
-      </button>
+      </Button>
       <p className="text-center text-xs leading-relaxed text-ink-400">
         No charge to book. A licensed injector reviews your photos and confirms
         what&apos;s right for you — in person.

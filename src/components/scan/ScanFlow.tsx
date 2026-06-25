@@ -435,7 +435,8 @@ export function ScanFlow() {
     <div className="mx-auto flex w-full flex-col items-center gap-8 sm:gap-10">
       <StepProgress current={STAGE_INDEX[step]} />
 
-      <div className={`w-full ${shell}`}>
+      {/* key={step} re-mounts on each transition so the entrance replays. */}
+      <div key={step} className={`w-full ${shell} animate-rise`}>
         {step === "intake" && (
           <div className="flex flex-col gap-8">
             <header className="text-center">

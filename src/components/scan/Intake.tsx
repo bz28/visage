@@ -9,6 +9,7 @@ import {
   type Gender,
   type Intake as IntakeData,
 } from "@/lib/intake-schema";
+import { Button } from "@/components/ui/Button";
 
 interface Props {
   onSubmit: (intake: IntakeData) => void;
@@ -103,12 +104,9 @@ export function Intake({ onSubmit }: Props) {
 
       {/* One CTA — every field is optional, so Continue carries the empty case
           too (no separate "Skip", which read as a confusing second choice). */}
-      <button
-        onClick={submit}
-        className="rounded-full bg-foreground px-7 py-4 font-medium text-background shadow-card transition-transform active:scale-[0.99]"
-      >
+      <Button onClick={submit} className="px-7 py-4">
         Continue
-      </button>
+      </Button>
     </div>
   );
 }
