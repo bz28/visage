@@ -52,7 +52,7 @@
 - `/plan` — draft an approach in conversation before starting a non-trivial feature
 - `/implement` — build a feature commit by commit, pausing for you to test
 - `/autopilot` — autonomous multi-commit execution on a well-scoped task
-- `/audit` — deep codebase scan for quality/security issues (two-pass, confirmed/suspected)
+- `/audit` — parallel sharded codebase audit: per-shard review → adversarial 2-skeptic verify → P0–P3 synthesis (via the `deep-audit` workflow). Cleanliness + privacy/framing emphasis.
 - `/review` — two-pass code review with confirmed/suspected labels; no fixes until approved
 - `/debug` — investigate root cause of a reported issue and propose a reliable fix
 - `/ui` — design or fix a frontend/UX surface through the patient/clinician lens
