@@ -163,9 +163,11 @@ async function main() {
     await page.getByText(/areas we'd explore/i).waitFor({ timeout: 30_000 });
 
     log("waiting for the combined before/after to render…");
-    // The "With treatment" image generates in the background; wait for it.
+    // The "With treatment" image generates in the background; wait for the front
+    // one (.first(), since the profile path adds a second matching image).
     await page
       .locator('img[alt*="Simulated result"]')
+      .first()
       .waitFor({ timeout: 60_000 });
 
     // Assert it actually decoded (non-zero dimensions).
