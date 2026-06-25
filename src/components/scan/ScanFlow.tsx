@@ -560,7 +560,12 @@ export function ScanFlow() {
 
         {step === "book" && analysis && (
           <BookConsult
-            interests={[...new Set(analysis.assessment.areas.map((a) => a.area))]}
+            // The areas the patient actually KEPT in their preview (in priority
+            // order), not the full recommended set — that's what they're telling
+            // the clinic they care about.
+            interests={[...new Set(analysis.assessment.areas.map((a) => a.area))].filter(
+              (area) => selected.has(area),
+            )}
             onDone={reset}
           />
         )}
