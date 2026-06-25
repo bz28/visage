@@ -175,10 +175,9 @@ async function main() {
     );
     log("combined before/after rendered (decoded).");
 
-    // The profile (two-angle) before/after also renders from the side photo.
-    // It runs two composite passes (validate + paint the selection), each a
-    // MediaPipe detect, so it's legitimately slower than the front in headless —
-    // give the waits generous headroom so CI doesn't flake.
+    // The profile (two-angle) before/after also renders — now a deterministic
+    // geometric WARP of the side photo (detect → warp), so give the wait
+    // headroom for the MediaPipe detect in headless.
     log("waiting for the profile before/after…");
     await page.getByText("Profile", { exact: true }).waitFor({ timeout: 45_000 });
     await page.waitForFunction(
@@ -187,6 +186,54 @@ async function main() {
       { timeout: 90_000 },
     );
     log("front + profile before/afters both rendered ✓");
+
+    // Assert the warp's core guarantee: it changes the projection region
+    // (chin/jaw) while leaving the upper face (eyes/brow) pixel-locked.
+    const lock = await page.evaluate(() => {
+      const befores = [...document.querySelectorAll('img[alt=""]')].filter(
+        (i) => i.naturalWidth > 50,
+      );
+      const afters = [
+        ...document.querySelectorAll('img[alt*="Simulated preview"]'),
+      ];
+      const before = befores[1];
+      const after = afters[1]; // [0] = front, [1] = profile
+      if (!before || !after) return { ok: false };
+      const W = 120,
+        H = 150;
+      const data = (im) => {
+        const c = document.createElement("canvas");
+        c.width = W;
+        c.height = H;
+        const x = c.getContext("2d");
+        x.drawImage(im, 0, 0, W, H);
+        return x.getImageData(0, 0, W, H).data;
+      };
+      const A = data(before),
+        B = data(after);
+      const diff = (y0, y1) => {
+        let s = 0,
+          n = 0;
+        for (let y = Math.floor(y0 * H); y < Math.floor(y1 * H); y++)
+          for (let xp = 0; xp < W; xp++) {
+            const i = (y * W + xp) * 4;
+            s += Math.abs(A[i] - B[i]);
+            n++;
+          }
+        return s / n;
+      };
+      return { ok: true, eye: diff(0.2, 0.45), projection: diff(0.6, 0.98) };
+    });
+    if (!lock.ok) fail("warp identity-lock check: profile pair not found");
+    // The locked upper face must change far less than the projection region.
+    if (lock.projection <= lock.eye) {
+      fail(
+        `warp not behaving: projection Δ${lock.projection.toFixed(2)} ≤ locked-eye Δ${lock.eye.toFixed(2)}`,
+      );
+    }
+    log(
+      `warp identity-lock verified (eye Δ${lock.eye.toFixed(2)} < projection Δ${lock.projection.toFixed(2)}) ✓`,
+    );
 
     if (consoleErrors.length) {
       fail(`console errors:\n  - ${consoleErrors.join("\n  - ")}`);
