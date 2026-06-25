@@ -349,12 +349,15 @@ export function ScanFlow() {
               imageHeight={front.height}
               markers={analysis.markers.filter((m) => selected.has(m.area))}
               highlightedArea={highlightedArea}
+              onPinClick={(area) =>
+                setHighlightedArea((cur) => (cur === area ? null : area))
+              }
               loading={combinedLoading}
               placeholder={
                 combinedFailed
                   ? "Preview unavailable — your read still stands."
                   : ![...selected].some(isSimulatable)
-                    ? "Select an area below to preview it."
+                    ? "Switch an area on below to see your preview."
                     : undefined
               }
             />

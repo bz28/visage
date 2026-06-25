@@ -194,7 +194,9 @@ export function PhotoCapture({
           {/* Label / instruction — always legible over the video. */}
           <div className="absolute bottom-0 left-0 right-0 rounded-b-2xl bg-gradient-to-t from-black/60 to-transparent px-4 pb-3 pt-8 text-center">
             <p className="text-sm font-medium text-white drop-shadow">
-              {view === "front" ? "Fit your face in the oval." : instruction}
+              {view === "front"
+                ? "Look straight on and fit your face in the oval."
+                : instruction}
             </p>
           </div>
         </div>
