@@ -5,7 +5,6 @@ import { generateText } from "ai";
 import {
   SIMULATABLE,
   LOOK_KEYS,
-  LOOKS,
   buildPrompt,
   buildCombinedPrompt,
 } from "@/lib/simulation";
@@ -45,8 +44,7 @@ export async function POST(req: Request) {
   if (body.areas?.length) {
     prompt = buildCombinedPrompt(body.areas, body.mouthOpen);
   } else if (body.area) {
-    const look = LOOKS.find((l) => l.key === (body.look ?? "natural"))!;
-    prompt = buildPrompt(body.area, look.ml, look.label, body.mouthOpen);
+    prompt = buildPrompt(body.area, body.look ?? "natural", body.mouthOpen);
   } else {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
