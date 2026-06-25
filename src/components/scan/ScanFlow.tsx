@@ -17,6 +17,7 @@ import {
   type SimulatableArea,
   type ProfileArea,
 } from "@/lib/simulation";
+import { warpAreas } from "@/lib/warp";
 import type { Assessment } from "@/lib/assessment-schema";
 import type { Intake as IntakeData } from "@/lib/intake-schema";
 import type { ViewKey } from "@/lib/views";
@@ -90,10 +91,16 @@ export function ScanFlow() {
   const [profileSrc, setProfileSrc] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileFailed, setProfileFailed] = useState(false);
-  // The prepared profile generation + the projection areas it covered — so
-  // toggling a chin/jaw/nose area re-pastes a subset of the SAME generation,
-  // just like the front. Refs because the async paths read the current values.
-  const profilePrepRef = useRef<CompositePrep | null>(null);
+  // The profile is now a deterministic geometric WARP (not a generative paste):
+  // we cache the side photo + its landmarks + the areas it covers, and re-warp a
+  // subset on toggle. The patient's own pixels, projected — no API, identity-safe,
+  // and correct at an angle (the generative paste distorted the lips on profiles).
+  const profileWarpRef = useRef<{
+    img: HTMLImageElement;
+    lm: Pt[];
+    width: number;
+    height: number;
+  } | null>(null);
   const profileAreasRef = useRef<ProfileArea[]>([]);
   // The preview (photo) column — so toggling can scroll it back into view on
   // mobile, where it's stacked above the plan and easily scrolled past.
@@ -191,7 +198,7 @@ export function ScanFlow() {
     // The profile preview (chin / jaw / nose) re-pastes too — but only when a
     // projection area was toggled, so a lips/cheeks toggle doesn't needlessly
     // re-paste the profile panel.
-    if (profilePrepRef.current && isProfileArea(area)) recomposeProfile(next);
+    if (profileWarpRef.current && isProfileArea(area)) recomposeProfile(next);
     // On mobile the preview can be scrolled out of view while toggling below it;
     // bring it back so the change is actually seen (no-op when it's visible).
     const el = previewRef.current;
@@ -200,10 +207,11 @@ export function ScanFlow() {
     }
   }
 
-  // Generate the optional profile before/after: detect landmarks on the side
-  // photo, edit the projection areas, composite the regions back. If the side
-  // photo can't be landmarked (a hard profile MediaPipe can't read), we simply
-  // don't show a profile result — the front stands on its own.
+  // The optional profile before/after: detect landmarks on the side photo, then
+  // WARP the projection areas (chin / jaw / nose) — moving the patient's own
+  // pixels along the face's 3D surface direction. No API, identity-safe, and
+  // correct at an angle. If the side photo can't be landmarked (a hard profile
+  // MediaPipe can't read), we show no profile result — the front stands alone.
   async function generateProfile(
     dataUrl: string,
     areas: ProfileArea[],
@@ -219,44 +227,13 @@ export function ScanFlow() {
       const det = await detectFace(img, w, h);
       if (det.status !== "ok" || !det.landmarks) return; // no usable profile
       if (gen !== genId.current) return; // superseded while detecting
-      const photo: Photo = { dataUrl, width: w, height: h };
-      setProfile(photo);
-      // Generate once (retrying on harness rejection) and cache the PREPARED
-      // generation, so toggling re-pastes a subset for free — like the front.
-      let prep: CompositePrep | null = null;
-      for (let attempt = 0; attempt < 3 && !prep; attempt++) {
-        const res = await fetch("/api/simulate", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ image: dataUrl, profileAreas: areas }),
-        });
-        const data: { image?: string } = await res.json();
-        if (!data.image) break;
-        const prepared = await prepareComposite(
-          dataUrl,
-          det.landmarks,
-          areas,
-          data.image,
-          w,
-          h,
-        );
-        if (prepared.ok && prepared.prep) prep = prepared.prep;
-        else console.warn(`[profile] rejected, retrying: ${prepared.reason}`);
-        if (gen !== genId.current) return;
-      }
-      if (gen !== genId.current) return;
-      // The panel is already mounted (setProfile ran); if generation didn't
-      // produce a usable output, mark it failed so it shows a note instead of an
-      // endless spinner that then vanishes.
-      if (prep) {
-        profilePrepRef.current = prep;
-        profileAreasRef.current = areas;
-        // Paste for the CURRENT selection (the patient may have toggled a
-        // projection area off while this was generating).
-        recomposeProfile(selectedRef.current);
-      } else {
-        setProfileFailed(true);
-      }
+      setProfile({ dataUrl, width: w, height: h });
+      // Cache the warp source (photo + landmarks) so toggling a projection area
+      // re-warps a subset instantly — and warp for the CURRENT selection (the
+      // patient may have toggled one off while we were detecting).
+      profileWarpRef.current = { img, lm: det.landmarks, width: w, height: h };
+      profileAreasRef.current = areas;
+      recomposeProfile(selectedRef.current);
     } catch {
       if (gen === genId.current) setProfileFailed(true);
     } finally {
@@ -264,20 +241,18 @@ export function ScanFlow() {
     }
   }
 
-  // Profile equivalent of recompose: re-paste the cached profile generation down
-  // to the selected projection areas (chin / jaw / nose) — a free local canvas
-  // op. If no projection area is selected, the profile preview drops away (it
-  // exists only to show projection). Separate from `recompose` rather than a
-  // param-heavy shared helper — the two read different state and stay readable.
+  // Re-warp the profile down to the selected projection areas (chin / jaw / nose)
+  // — a free, deterministic, on-device op. If no projection area is selected the
+  // profile preview drops away (it exists only to show projection).
   function recomposeProfile(sel: Set<string>) {
-    const prep = profilePrepRef.current;
-    if (!prep) return;
+    const src = profileWarpRef.current;
+    if (!src) return;
     const picked = profileAreasRef.current.filter((a) => sel.has(a));
     if (picked.length === 0) {
       setProfileSrc(null);
       return;
     }
-    const dataUrl = pasteComposite(prep, picked);
+    const dataUrl = warpAreas(src.img, src.lm, picked, src.width, src.height);
     if (dataUrl) setProfileSrc(dataUrl);
   }
 
@@ -392,7 +367,7 @@ export function ScanFlow() {
     setProfileSrc(null);
     setProfileLoading(false);
     setProfileFailed(false);
-    profilePrepRef.current = null;
+    profileWarpRef.current = null;
     profileAreasRef.current = [];
     applySelection(new Set());
     setStep("intake");
