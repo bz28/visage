@@ -141,7 +141,7 @@ export function Capture({ initialPhotos, concern = "", onDone }: Props) {
               </div>
               <button
                 onClick={() => setCapturing(v.key)}
-                className="shrink-0 rounded-full border border-ink-300 px-4 py-1.5 text-sm font-medium"
+                className="shrink-0 rounded-full border border-ink-300 px-4 py-2.5 text-sm font-medium"
               >
                 {url ? "Retake" : "Add"}
               </button>

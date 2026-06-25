@@ -169,7 +169,7 @@ function Switch({
         e.stopPropagation(); // don't also trigger the card's highlight
         onToggle();
       }}
-      className="flex shrink-0 items-center gap-2"
+      className="flex shrink-0 items-center gap-2 rounded-full p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
     >
       <span
         className={`text-[11px] font-medium uppercase tracking-wide ${
