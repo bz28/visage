@@ -114,7 +114,8 @@ export function BookConsult({ interests, onDone }: Props) {
           required
           value={contact}
           onChange={(e) => setContact(e.target.value)}
-          className="rounded-lg border border-neutral-300 px-3 py-2.5 font-normal text-foreground transition-colors focus:border-[var(--accent)] focus:outline-none"
+          placeholder="you@email.com or (555) 555-5555"
+          className="rounded-lg border border-neutral-300 px-3 py-2.5 font-normal text-foreground placeholder:text-neutral-400 transition-colors focus:border-[var(--accent)] focus:outline-none"
         />
       </label>
       <label className="flex flex-col gap-1.5 text-sm font-medium text-neutral-600">

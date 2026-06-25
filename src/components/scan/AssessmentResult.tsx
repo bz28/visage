@@ -40,11 +40,11 @@ export function AssessmentResult({
         <>
           <div className="flex items-baseline justify-between gap-3">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-400">
-              Your treatment plan
+              Areas we&apos;d explore
             </p>
             {uniqueAreas.length > 1 && (
               <p className="text-xs text-neutral-400">
-                Switch any area off to compare
+                Point at an area to find it on your photo
               </p>
             )}
           </div>
@@ -53,11 +53,15 @@ export function AssessmentResult({
               const on = selected.has(a.area);
               const label = AREA_LABELS[a.area];
               return (
+                // Hover / tap / keyboard-focus highlights this area's pin on the
+                // photo (focus bubbles up from the switch inside).
                 <li
                   key={a.area}
                   onMouseEnter={() => onHighlight(a.area)}
                   onMouseLeave={() => onHighlight(null)}
                   onClick={() => onHighlight(a.area)}
+                  onFocus={() => onHighlight(a.area)}
+                  onBlur={() => onHighlight(null)}
                   className={`flex items-start justify-between gap-3 rounded-2xl border p-4 transition-colors ${
                     on
                       ? "border-border bg-surface hover:border-neutral-300"

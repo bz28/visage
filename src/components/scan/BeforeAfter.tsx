@@ -13,6 +13,8 @@ interface Props {
   markers: Marker[];
   /** Area to emphasize (hovered/tapped in the plan); dims the others. */
   highlightedArea?: string | null;
+  /** Tapping a dot on the photo highlights that area (reveals its label). */
+  onPinClick?: (area: string) => void;
   loading: boolean;
   /** Shown over the photo when there's no "after" and we're not loading. */
   placeholder?: string;
@@ -33,6 +35,7 @@ export function BeforeAfter({
   imageHeight,
   markers,
   highlightedArea,
+  onPinClick,
   loading,
   placeholder,
 }: Props) {
@@ -72,10 +75,11 @@ export function BeforeAfter({
   const showAfter = !!afterSrc;
   const sliderMode = mode === "slider" && showAfter;
   // Side-by-side shows two full photos, so the frame is twice as wide — that
-  // keeps each column at the photo's own aspect, so object-cover doesn't crop
-  // and the pins line up.
+  // keeps each column at the photo's own aspect (object-cover doesn't crop, pins
+  // line up). It's wide whenever side mode is active, even while the "after" is
+  // still generating, so the two-up layout doesn't jump in when it lands.
   const aspect =
-    mode === "side" && showAfter
+    mode === "side"
       ? `${imageWidth * 2} / ${imageHeight}`
       : `${imageWidth} / ${imageHeight}`;
   // With no "after", the before must fill the frame regardless of slider state.
@@ -117,17 +121,34 @@ export function BeforeAfter({
         onPointerCancel={() => setDrag(false)}
         onLostPointerCapture={() => setDrag(false)}
       >
-        {mode === "side" && showAfter ? (
-          // Side-by-side: now | with treatment.
+        {mode === "side" ? (
+          // Side-by-side: now | with treatment. The right panel shows a ghost
+          // (skeleton + status) until the "after" is ready, so the layout is
+          // set from the start.
           <div className="grid size-full grid-cols-2">
             <div className="relative overflow-hidden border-r border-white/60">
               <Photo src={beforeSrc} />
-              <Pins markers={markers} imageWidth={imageWidth} imageHeight={imageHeight} highlightedArea={highlightedArea} />
+              <Pins markers={markers} imageWidth={imageWidth} imageHeight={imageHeight} highlightedArea={highlightedArea} interactive onPinClick={onPinClick} />
               <Caption side="left">Now</Caption>
             </div>
-            <div className="relative overflow-hidden">
-              <Photo src={afterSrc} alt="Simulated result with the recommended treatment" reveal onReady={onAfterReady} />
-              <Badge />
+            <div className="relative overflow-hidden bg-neutral-100">
+              {showAfter ? (
+                <>
+                  <Photo src={afterSrc} alt="Simulated result with the recommended treatment" reveal onReady={onAfterReady} />
+                  <Badge />
+                </>
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 px-3 text-center">
+                  {loading ? (
+                    <>
+                      <span className="size-6 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+                      <span className="text-xs text-neutral-500">Creating your preview…</span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-neutral-400">{placeholder}</span>
+                  )}
+                </div>
+              )}
               <Caption side="right" accent>
                 With treatment
               </Caption>
@@ -244,20 +265,30 @@ function Pins({
   imageWidth,
   imageHeight,
   highlightedArea,
+  interactive,
+  onPinClick,
 }: {
   markers: Marker[];
   imageWidth: number;
   imageHeight: number;
   highlightedArea?: string | null;
+  /** Side-by-side mode (no drag) → dots are tappable to reveal their label. */
+  interactive?: boolean;
+  onPinClick?: (area: string) => void;
 }) {
   // Only dim siblings when the highlighted area is actually shown as a pin (it
   // may have just been toggled off — then nothing should dim).
   const active = markers.some((m) => m.area === highlightedArea);
+  const dotClass = (hi: boolean) =>
+    `block rounded-full bg-[var(--accent)] transition-all ${
+      hi ? "size-2.5 ring-4 ring-[var(--accent)]/30" : "size-2 ring-2 ring-white/90"
+    }`;
   return (
     <>
       {markers.map((m) => {
         const hi = m.area === highlightedArea;
         const dim = active && !hi;
+        const label = AREA_LABELS[m.area];
         return (
           <div
             key={m.area}
@@ -269,14 +300,27 @@ function Pins({
               top: `${(m.point.y / imageHeight) * 100}%`,
             }}
           >
-            <span
-              className={`rounded-full bg-[var(--accent)] transition-all ${
-                hi ? "size-2.5 ring-4 ring-[var(--accent)]/30" : "size-2 ring-2 ring-white/90"
-              }`}
-            />
-            <span className="whitespace-nowrap rounded-full bg-black/75 px-2 py-0.5 text-[11px] font-semibold text-white">
-              {AREA_LABELS[m.area]}
-            </span>
+            {interactive && onPinClick ? (
+              <button
+                type="button"
+                aria-label={label}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPinClick(m.area);
+                }}
+                className="pointer-events-auto flex size-6 items-center justify-center"
+              >
+                <span className={dotClass(hi)} />
+              </button>
+            ) : (
+              <span className={dotClass(hi)} />
+            )}
+            {/* Label only for the highlighted pin — keeps the photo uncluttered. */}
+            {hi && (
+              <span className="whitespace-nowrap rounded-full bg-black/75 px-2 py-0.5 text-[11px] font-semibold text-white">
+                {label}
+              </span>
+            )}
           </div>
         );
       })}

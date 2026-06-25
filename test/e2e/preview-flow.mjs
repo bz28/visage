@@ -93,14 +93,14 @@ async function main() {
     log("loading app…");
     await page.goto(BASE, { waitUntil: "networkidle", timeout: 90_000 });
 
-    // Skip intake → upload the fixture face. Retry the Skip→capture transition,
-    // since an early click can be lost before React hydrates (esp. on the dev
-    // server's first compile).
-    const skip = page.getByRole("button", { name: /Skip/i }).first();
-    await skip.waitFor({ state: "visible", timeout: 60_000 });
+    // Advance past intake (all fields optional) → upload the fixture face.
+    // Retry the Continue→capture transition, since an early click can be lost
+    // before React hydrates (esp. on the dev server's first compile).
+    const cont = page.getByRole("button", { name: /Continue/i }).first();
+    await cont.waitFor({ state: "visible", timeout: 60_000 });
     const fileInput = page.locator('input[type="file"]');
     for (let i = 0; i < 5; i++) {
-      await skip.click().catch(() => {});
+      await cont.click().catch(() => {});
       try {
         await fileInput.waitFor({ state: "attached", timeout: 4_000 });
         break;
@@ -148,8 +148,8 @@ async function main() {
       );
     }
 
-    // The treatment plan + combined before/after render automatically.
-    await page.getByText(/treatment plan/i).waitFor({ timeout: 30_000 });
+    // The areas list + combined before/after render automatically.
+    await page.getByText(/areas we'd explore/i).waitFor({ timeout: 30_000 });
 
     log("waiting for the combined before/after to render…");
     // The "With treatment" image generates in the background; wait for it.

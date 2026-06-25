@@ -101,20 +101,14 @@ export function Intake({ onSubmit }: Props) {
         </Field>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <button
-          onClick={submit}
-          className="rounded-full bg-foreground px-7 py-4 font-medium text-background shadow-sm transition-transform active:scale-[0.99]"
-        >
-          Continue
-        </button>
-        <button
-          onClick={() => onSubmit({ goals: [] })}
-          className="text-sm text-neutral-400 underline-offset-2 hover:text-neutral-600 hover:underline"
-        >
-          Skip — just show me my read
-        </button>
-      </div>
+      {/* One CTA — every field is optional, so Continue carries the empty case
+          too (no separate "Skip", which read as a confusing second choice). */}
+      <button
+        onClick={submit}
+        className="rounded-full bg-foreground px-7 py-4 font-medium text-background shadow-sm transition-transform active:scale-[0.99]"
+      >
+        Continue
+      </button>
     </div>
   );
 }
