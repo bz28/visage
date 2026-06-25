@@ -5,7 +5,9 @@ export const VIEWS = [
     key: "front",
     label: "Front",
     required: true,
-    instruction: "Look straight at the camera.",
+    // Mouth-closed matters: lip simulation can't preserve an open/pursed mouth,
+    // so an open mouth makes the front preview fail our expression guard.
+    instruction: "Look straight at the camera, with a relaxed, closed mouth (no teeth).",
   },
   {
     key: "profile",
