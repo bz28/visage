@@ -1,24 +1,37 @@
 /**
- * The three filler amounts.
+ * The three filler intensities (a label + how-much wording).
  *
  * NOTE: the patient flow shows ONE optimal result (the Natural amount) — see
  * `buildCombinedPrompt`. The Subtle/Natural/Fuller selector and per-area editing
  * (`buildPrompt`) power the upcoming **clinician tool**, where the injector
  * dials each area; they're kept here for that, not used in the patient UI.
- *
- * The mL figures are CLINICAL PLACEHOLDERS pending surgeon calibration — see
- * docs/surgeon-calibration.md.
  */
 export const LOOK_KEYS = ["subtle", "natural", "fuller"] as const;
 export type LookKey = (typeof LOOK_KEYS)[number];
 
-export const LOOKS: { key: LookKey; label: string; ml: number; degree: string }[] = [
-  { key: "subtle", label: "Subtle", ml: 0.5, degree: "very subtly" },
-  { key: "natural", label: "Natural", ml: 1.0, degree: "naturally" },
-  { key: "fuller", label: "Fuller", ml: 1.5, degree: "noticeably but still tastefully" },
+export const LOOKS: { key: LookKey; label: string; degree: string }[] = [
+  { key: "subtle", label: "Subtle", degree: "very subtly" },
+  { key: "natural", label: "Natural", degree: "naturally" },
+  { key: "fuller", label: "Fuller", degree: "noticeably but still tastefully" },
 ];
 
 export const DEFAULT_LOOK: LookKey = "natural";
+
+/**
+ * Per-area filler amounts (mL) for subtle / natural / fuller. CLINICAL
+ * PLACEHOLDERS built from standard ranges — pending surgeon calibration (see
+ * docs/surgeon-calibration.md §A/E). Jawline/cheeks are totals across both
+ * sides; folds are per side. These only feed the clinician tool's prompt
+ * wording today (the patient flow is qualitative) — never shown to patients.
+ */
+export const AREA_AMOUNTS: Record<SimulatableArea, Record<LookKey, number>> = {
+  lips: { subtle: 0.5, natural: 1.0, fuller: 1.5 },
+  chin: { subtle: 0.5, natural: 1.0, fuller: 2.0 },
+  jawline: { subtle: 1.0, natural: 2.0, fuller: 4.0 },
+  cheeks: { subtle: 0.5, natural: 1.0, fuller: 2.0 },
+  nasolabial: { subtle: 0.5, natural: 1.0, fuller: 1.5 },
+  marionette: { subtle: 0.5, natural: 1.0, fuller: 1.5 },
+};
 
 /**
  * Areas we can preview from a single FRONT photo. Lips read best; chin, jawline,
@@ -101,11 +114,11 @@ export function buildCombinedPrompt(
  */
 export function buildPrompt(
   area: SimulatableArea,
-  ml: number,
-  label: string,
+  look: LookKey,
   mouthOpen?: boolean,
 ): string {
-  const degree = LOOKS.find((l) => l.label === label)?.degree ?? "naturally";
+  const { label, degree } = LOOKS.find((l) => l.key === look)!;
+  const ml = AREA_AMOUNTS[area][look];
   return (
     `Edit this photo: ${AREA_EDIT[area]}, ${degree} (about ${ml} ml of filler — ` +
     `a ${label.toLowerCase()} amount). Change ONLY the ${area} — nothing else. ` +

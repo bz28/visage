@@ -145,9 +145,13 @@ sanity-check them:
 - Asymmetry index: `> 0.08` worth noting
 → *Change:* the thresholds in `measurements.ts` + `baseline.ts`.
 
-**23. 🟡 Are the 3 preview amounts realistic?** Subtle ≈ 0.5 ml · Natural ≈ 1.0 ml
-· Fuller ≈ 1.5 ml (currently the same for every area).
-→ *Change:* `LOOKS` in `simulation.ts` (also see Q1 for per-area amounts).
+**23. 🟡 Are the per-area amounts (mL) realistic?** Now set per area (subtle /
+natural / fuller), built from standard ranges — please correct:
+- Lips 0.5 / 1.0 / 1.5 · Chin 0.5 / 1.0 / 2.0 · Cheeks 0.5 / 1.0 / 2.0 (total)
+- Jawline 1.0 / 2.0 / 4.0 (total, both sides)
+- Nasolabial 0.5 / 1.0 / 1.5 (per side) · Marionette 0.5 / 1.0 / 1.5 (per side)
+→ *Change:* `AREA_AMOUNTS` in `simulation.ts`. Only feeds the clinician tool's
+prompt wording today; never shown to patients.
 
 ---
 
