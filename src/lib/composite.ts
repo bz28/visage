@@ -13,11 +13,6 @@ import type { EditableArea } from "./simulation";
  * can retry. This is what makes "only the lips change" a guarantee, not a hope.
  */
 
-export interface CompositeResult {
-  ok: boolean;
-  dataUrl?: string;
-  reason?: string;
-}
 
 const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -48,25 +43,42 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 /**
- * Composite the treated regions of the AI output back onto the patient's
- * original photo — `areas` may be one (clinician per-area editing) or all of
- * them at once (the patient's single combined result). Everything outside the
- * union of the regions stays the original pixels.
+ * Everything needed to paste treated regions onto the original — computed ONCE
+ * per generation (the expensive face-detect + alignment), then reused for every
+ * toggle. `originalLm` masks the regions; the eye-corner transform aligns the
+ * generated image; both are constant once the generation is fixed.
  */
-export async function compositeAreas(
+export interface CompositePrep {
+  orig: HTMLImageElement;
+  gen: HTMLImageElement;
+  originalLm: Pt[];
+  rot: number;
+  scale: number;
+  qR: Pt;
+  pR: Pt;
+  width: number;
+  height: number;
+}
+
+/**
+ * The expensive half: load both images, re-detect the face on the AI output to
+ * align + verify it (the mouth-drift harness), and compute the eye-corner
+ * transform. Run once when a generation lands; the result feeds `pasteComposite`.
+ * `areasForValidation` is the full generated set (only used for the lip harness).
+ */
+export async function prepareComposite(
   originalDataUrl: string,
   originalLm: Pt[],
-  areas: EditableArea[],
+  areasForValidation: EditableArea[],
   generatedDataUrl: string,
   width: number,
   height: number,
-): Promise<CompositeResult> {
+): Promise<{ ok: boolean; reason?: string; prep?: CompositePrep }> {
   const [orig, gen] = await Promise.all([
     loadImage(originalDataUrl),
     loadImage(generatedDataUrl),
   ]);
 
-  // Re-detect the face on the AI output so we can align + verify it.
   const det = await detectFace(gen, gen.naturalWidth, gen.naturalHeight);
   if (det.status !== "ok" || !det.landmarks) {
     return { ok: false, reason: "no face found in generated image" };
@@ -76,7 +88,7 @@ export async function compositeAreas(
   // Verify: if lips are edited, the mouth must not have opened/closed (the one
   // thing the composite can't fix, since the lip region IS the mouth). 0.05 ≈ a
   // 5%-of-eye-distance change in lip gap — a CV tolerance for "expression held".
-  if (areas.includes("lips")) {
+  if (areasForValidation.includes("lips")) {
     const openO = mouthOpenness(originalLm);
     const openG = mouthOpenness(genLm);
     if (Math.abs(openG - openO) > 0.05) {
@@ -87,8 +99,8 @@ export async function compositeAreas(
     }
   }
 
-  // Align the generated image onto the original using the eye corners (stable —
-  // outside every area we edit), as a similarity transform (rotate + scale).
+  // Eye corners are stable (outside every area we edit) → a similarity transform
+  // (rotate + scale) aligning the generated image onto the original.
   const pR = genLm[KEY.eyeOuterR];
   const pL = genLm[KEY.eyeOuterL];
   const qR = originalLm[KEY.eyeOuterR];
@@ -97,20 +109,33 @@ export async function compositeAreas(
     Math.atan2(qL.y - qR.y, qL.x - qR.x) - Math.atan2(pL.y - pR.y, pL.x - pR.x);
   const scale = dist(qR, qL) / dist(pR, pL);
 
+  return { ok: true, prep: { orig, gen, originalLm, rot, scale, qR, pR, width, height } };
+}
+
+/**
+ * The cheap half: paste the treated regions of the (already-prepared) generation
+ * onto the original. Pure canvas — no face-detect — so toggling which areas are
+ * shown is instant and free. `areas` is the currently-selected subset.
+ */
+export function pasteComposite(
+  prep: CompositePrep,
+  areas: EditableArea[],
+): string | null {
+  const { orig, gen, originalLm, rot, scale, qR, pR, width, height } = prep;
+
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) return { ok: false, reason: "no canvas context" };
+  if (!ctx) return null;
   ctx.drawImage(orig, 0, 0, width, height);
 
-  // Build the union mask of all treated regions (drawn source-over so they add,
-  // not intersect).
+  // Union mask of the selected regions (source-over so they add, not intersect).
   const mask = document.createElement("canvas");
   mask.width = width;
   mask.height = height;
   const mctx = mask.getContext("2d");
-  if (!mctx) return { ok: false, reason: "no canvas context" };
+  if (!mctx) return null;
   for (const area of areas) {
     paintAreaRegion(mctx, originalLm, area, width, height, "#fff");
   }
@@ -120,7 +145,7 @@ export async function compositeAreas(
   off.width = width;
   off.height = height;
   const octx = off.getContext("2d");
-  if (!octx) return { ok: false, reason: "no canvas context" };
+  if (!octx) return null;
   octx.save();
   octx.translate(qR.x, qR.y);
   octx.rotate(rot);
@@ -133,5 +158,5 @@ export async function compositeAreas(
   octx.globalCompositeOperation = "source-over";
 
   ctx.drawImage(off, 0, 0);
-  return { ok: true, dataUrl: canvas.toDataURL("image/png") };
+  return canvas.toDataURL("image/png");
 }
