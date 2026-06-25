@@ -166,13 +166,13 @@ async function main() {
     // The "With treatment" image generates in the background; wait for the front
     // one (.first(), since the profile path adds a second matching image).
     await page
-      .locator('img[alt*="Simulated result"]')
+      .locator('img[alt*="Simulated preview"]')
       .first()
       .waitFor({ timeout: 60_000 });
 
     // Assert it actually decoded (non-zero dimensions).
     const dims = await page.evaluate(() => {
-      const img = document.querySelector('img[alt*="Simulated result"]');
+      const img = document.querySelector('img[alt*="Simulated preview"]');
       return img ? { w: img.naturalWidth, h: img.naturalHeight } : null;
     });
     if (!dims || dims.w === 0 || dims.h === 0) {
@@ -188,7 +188,7 @@ async function main() {
     await page.getByText("Profile", { exact: true }).waitFor({ timeout: 45_000 });
     await page.waitForFunction(
       () =>
-        document.querySelectorAll('img[alt*="Simulated result"]').length >= 2,
+        document.querySelectorAll('img[alt*="Simulated preview"]').length >= 2,
       { timeout: 90_000 },
     );
     log("front + profile before/afters both rendered ✓");

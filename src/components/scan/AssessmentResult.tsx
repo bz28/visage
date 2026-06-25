@@ -16,6 +16,15 @@ interface Props {
   onBook: () => void;
 }
 
+// How sure the read is, in the patient's language — anchored to OUR read, not a
+// verdict on them. Low confidence leans into "confirm in person", which is both
+// honest and the right see-a-provider nudge.
+const CONFIDENCE_LABEL: Record<"low" | "medium" | "high", string> = {
+  high: "Clear from your photo",
+  medium: "A fairly clear read",
+  low: "Best confirmed in person",
+};
+
 /**
  * The patient result is deliberately simple (surgeon's direction): a short
  * treatment-plan list, then the booking CTA. Each area shows its explanation
@@ -31,9 +40,10 @@ export function AssessmentResult({
   onHighlight,
   onBook,
 }: Props) {
-  const uniqueAreas = assessment.areas.filter(
-    (a, i) => assessment.areas.findIndex((b) => b.area === a.area) === i,
-  );
+  const uniqueAreas = assessment.areas
+    .filter((a, i) => assessment.areas.findIndex((b) => b.area === a.area) === i)
+    // Lead with what we'd most want to talk through (priority 1 = first).
+    .sort((a, b) => a.priority - b.priority);
 
   return (
     <div className="flex flex-col gap-5">
@@ -45,7 +55,7 @@ export function AssessmentResult({
             </p>
             {uniqueAreas.length > 1 && (
               <p className="text-xs text-ink-400">
-                Point at an area to find it on your photo
+                Tap an area to find it on your photo
               </p>
             )}
           </div>
@@ -71,11 +81,31 @@ export function AssessmentResult({
                       : "border-dashed border-ink-300 bg-transparent"
                   }`}
                 >
-                  <div className={on ? "" : "opacity-55"}>
-                    <p className="font-medium">{label}</p>
+                  <div className={`min-w-0 ${on ? "" : "opacity-55"}`}>
+                    <p className="flex items-center gap-2 font-medium">
+                      {/* A dot that matches this area's pin on the photo, so the
+                          card↔pin link is obvious. Only when it's in the preview
+                          (= a pin is actually shown). */}
+                      {on && (
+                        <span
+                          className="size-2 shrink-0 rounded-full bg-[var(--accent)]"
+                          aria-hidden
+                        />
+                      )}
+                      {label}
+                    </p>
                     <p className="mt-0.5 text-sm leading-relaxed text-ink-500">
                       {a.why}
                     </p>
+                    <span
+                      className={`mt-2 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                        a.confidence === "low"
+                          ? "bg-[var(--accent)]/10 text-[var(--accent)]"
+                          : "bg-ink-100 text-ink-500"
+                      }`}
+                    >
+                      {CONFIDENCE_LABEL[a.confidence]}
+                    </span>
                   </div>
                   <Switch on={on} label={label} onToggle={() => onToggle(a.area)} />
                 </li>
@@ -93,7 +123,7 @@ export function AssessmentResult({
 
       <p className="text-xs leading-relaxed text-ink-400">{DISCLAIMER}</p>
 
-      <div className="z-10 flex flex-col gap-2.5 rounded-2xl border border-border bg-surface/95 p-3 shadow-lg backdrop-blur md:sticky md:bottom-4">
+      <div className="sticky bottom-4 z-10 flex flex-col gap-2.5 rounded-2xl border border-border bg-surface/95 p-3 shadow-pop backdrop-blur">
         <Button onClick={onBook} className="px-7 py-3.5">
           Book a consultation
         </Button>
