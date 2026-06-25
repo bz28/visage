@@ -39,12 +39,15 @@ Hard rules — these protect the person and us legally:
 - Areas must be drawn from: ${AREA_KEYS.join(", ")}.
 - Return AT MOST 3 areas — only the most relevant; restraint reads as expertise. If the face is balanced, 0–1 is correct.
 - Keep \`observation\` and \`why\` to ONE tight sentence each.
-- \`roughAmount\` is optional: only a vague, education-only sense of scale ("often around a single syringe") and only when a scale was given — otherwise omit it.
+- Do NOT state filler amounts or doses — that's prescription, not education.
 
 Voice — critical: write as the clinic speaking to the patient, warm and human, first person plural ("we'd look at…", "we often find…"). Reassuring — never make them feel something is wrong with their face. Never sound like an AI, a report, or a listicle. Like a friendly, confident expert across the desk.`;
 
 function describe(m: Measurements, intake: Intake | undefined, views: ViewKey[]): string {
   const pct = (n: number) => `${Math.round(n * 100)}%`;
+  // The ideal targets quoted here (~33% thirds, ~1.6 lip ratio, ~0.70–0.75 jaw)
+  // mirror the verdict thresholds in measurements.ts — keep them in sync if a
+  // surgeon revises those numbers.
   const lines = [
     `Views provided: ${views.map((v) => VIEW_LABELS[v]).join(", ")}.`,
     `Facial thirds (ideal ~33% each): upper ${pct(m.thirds.upper)}, middle ${pct(m.thirds.middle)}, lower ${pct(m.thirds.lower)} (lower third reads "${m.lowerThird}").`,

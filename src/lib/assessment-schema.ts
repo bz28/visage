@@ -46,8 +46,11 @@ export const areaSchema = z.object({
   confidence: z.enum(["low", "medium", "high"]),
   /** 1 = discuss first. Lower sorts earlier. */
   priority: z.number().int().min(1).max(10),
-  /** Optional, vague, education-only sense of scale (e.g. "often around one syringe"). Omit if unsure. */
-  roughAmount: z.string().optional(),
+  // NOTE: we intentionally do NOT carry a filler amount here. Showing patients an
+  // amount drifts toward prescription, which we avoid (education-not-prescription).
+  // Per-area amounts live in simulation.ts for the clinician tool only. Whether a
+  // vague "sense of scale" is ever appropriate for patients is a question for the
+  // surgeon (docs/surgeon-calibration.md).
 });
 
 export type AssessmentArea = z.infer<typeof areaSchema>;

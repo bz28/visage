@@ -5,8 +5,8 @@ import type { Assessment } from "./assessment-schema";
  * Lets UI work on the result/book screens run instantly and for free — no paid
  * vision call, no ~90s wait. Spans several simulatable areas with mixed
  * confidence (including nasolabial + marionette, so the e2e exercises those
- * region masks) plus one roughAmount. A real read returns at most 3 areas;
- * this fixture deliberately carries more for coverage. Never used in production.
+ * region masks). A real read returns at most 3 areas; this fixture deliberately
+ * carries more for coverage. Never used in production.
  *
  * Keep the copy in the same education-not-prescription register as the real AI,
  * so what we iterate against looks like what ships.
@@ -23,7 +23,6 @@ export const MOCK_ASSESSMENT: Assessment = {
       why: "Lips are a common thing to explore here — a little more in the lower lip can bring a soft, natural fullness that still looks like you.",
       confidence: "medium",
       priority: 1,
-      roughAmount: "often around a single syringe",
     },
     {
       area: "chin",
