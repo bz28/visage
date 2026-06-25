@@ -130,7 +130,7 @@ export function BookConsult({ interests, onDone }: Props) {
       </label>
 
       {status === "error" && (
-        <p className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-red-600">
           Something went wrong — please try again.
         </p>
       )}

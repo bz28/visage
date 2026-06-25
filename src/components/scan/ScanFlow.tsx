@@ -91,6 +91,9 @@ export function ScanFlow() {
   const profilePhotoRef = useRef<Photo | null>(null);
   const profileAreasRef = useRef<ProfileArea[]>([]);
   const profileRecomposeId = useRef(0);
+  // The preview (photo) column — so toggling can scroll it back into view on
+  // mobile, where it's stacked above the plan and easily scrolled past.
+  const previewRef = useRef<HTMLDivElement>(null);
   // Areas the patient currently wants included (defaults to all recommended).
   // A ref mirrors it so async paths (a slow generation completing) read the
   // CURRENT selection, not the value captured when they started.
@@ -199,6 +202,12 @@ export function ScanFlow() {
     // projection area was toggled, so a lips/cheeks toggle doesn't needlessly
     // re-composite (and flicker) the profile panel.
     if (profileRawRef.current && isProfileArea(area)) void recomposeProfile(next);
+    // On mobile the preview can be scrolled out of view while toggling below it;
+    // bring it back so the change is actually seen (no-op when it's visible).
+    const el = previewRef.current;
+    if (el && el.getBoundingClientRect().bottom < 80) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   }
 
   // Generate the optional profile before/after: detect landmarks on the side
@@ -463,7 +472,10 @@ export function ScanFlow() {
         {step === "capture" && (
           <div className="flex flex-col gap-6">
             {error && (
-              <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <p
+                role="alert"
+                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+              >
                 {error}
               </p>
             )}
@@ -512,7 +524,10 @@ export function ScanFlow() {
                   }`}
                 >
                   {hasPreview && (
-                    <div className="flex flex-col gap-5 lg:sticky lg:top-6">
+                    <div
+                      ref={previewRef}
+                      className="flex flex-col gap-5 lg:sticky lg:top-6"
+                    >
                       {/* Front before/after (the hero). Labelled "Front" only
                           when a profile result is also shown. Keyed by the photo
                           so per-scan UI state resets on a new scan. */}

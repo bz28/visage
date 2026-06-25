@@ -43,15 +43,17 @@ export function BeforeAfter({
   // that makes a subtle change legible (recovers what the old slider gave).
   const [comparing, setComparing] = useState(false);
   // Two full photos side by side → the frame is twice as wide, so each column
-  // keeps the photo's own aspect (object-cover doesn't crop, pins line up).
-  const aspect = `${imageWidth * 2} / ${imageHeight}`;
+  // Each panel keeps the photo's own aspect (object-cover doesn't crop, pins
+  // line up). Stacked full-width on phones so faces aren't halved; side-by-side
+  // from sm up.
+  const panelAspect = `${imageWidth} / ${imageHeight}`;
 
   return (
-    <div
-      className="mx-auto grid w-full max-w-2xl grid-cols-2 overflow-hidden rounded-3xl bg-ink-100 shadow-pop ring-1 ring-black/5"
-      style={{ aspectRatio: aspect }}
-    >
-      <div className="relative overflow-hidden border-r border-white/60">
+    <div className="mx-auto grid w-full max-w-2xl grid-cols-1 overflow-hidden rounded-3xl bg-ink-100 shadow-pop ring-1 ring-black/5 sm:grid-cols-2">
+      <div
+        className="relative overflow-hidden border-b border-white/60 sm:border-b-0 sm:border-r"
+        style={{ aspectRatio: panelAspect }}
+      >
         <Photo src={beforeSrc} />
         <Pins
           markers={markers}
@@ -64,6 +66,7 @@ export function BeforeAfter({
       </div>
       <div
         className="relative select-none touch-pan-y overflow-hidden bg-ink-100"
+        style={{ aspectRatio: panelAspect }}
         onPointerDown={showAfter ? () => setComparing(true) : undefined}
         onPointerUp={() => setComparing(false)}
         onPointerLeave={() => setComparing(false)}
@@ -181,21 +184,24 @@ function Pins({
             {onPinClick ? (
               <button
                 type="button"
-                aria-label={label}
+                aria-label={`Show ${label} on photo`}
                 onClick={() => onPinClick(m.area)}
-                className="pointer-events-auto flex size-6 items-center justify-center"
+                className="peer pointer-events-auto flex size-10 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <span className={dotClass(hi)} />
               </button>
             ) : (
               <span className={dotClass(hi)} />
             )}
-            {/* Label only for the highlighted pin — keeps the photo uncluttered. */}
-            {hi && (
-              <span className="whitespace-nowrap rounded-full bg-black/75 px-2 py-0.5 text-[11px] font-semibold text-white">
-                {label}
-              </span>
-            )}
+            {/* Label for the highlighted pin (kept uncluttered) — and on keyboard
+                focus, so tabbing the pins reveals what each is. */}
+            <span
+              className={`whitespace-nowrap rounded-full bg-black/75 px-2 py-0.5 text-[11px] font-semibold text-white ${
+                hi ? "block" : "hidden peer-focus-visible:block"
+              }`}
+            >
+              {label}
+            </span>
           </div>
         );
       })}
