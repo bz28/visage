@@ -39,13 +39,16 @@ export function BeforeAfter({
   placeholder,
 }: Props) {
   const showAfter = !!afterSrc;
+  // Press-and-hold the "after" to peek at the original in place — a direct A/B
+  // that makes a subtle change legible (recovers what the old slider gave).
+  const [comparing, setComparing] = useState(false);
   // Two full photos side by side → the frame is twice as wide, so each column
   // keeps the photo's own aspect (object-cover doesn't crop, pins line up).
   const aspect = `${imageWidth * 2} / ${imageHeight}`;
 
   return (
     <div
-      className="mx-auto grid w-full max-w-2xl grid-cols-2 overflow-hidden rounded-3xl bg-ink-100 shadow-lg ring-1 ring-black/5"
+      className="mx-auto grid w-full max-w-2xl grid-cols-2 overflow-hidden rounded-3xl bg-ink-100 shadow-pop ring-1 ring-black/5"
       style={{ aspectRatio: aspect }}
     >
       <div className="relative overflow-hidden border-r border-white/60">
@@ -59,15 +62,36 @@ export function BeforeAfter({
         />
         <Caption side="left">Now</Caption>
       </div>
-      <div className="relative overflow-hidden bg-ink-100">
+      <div
+        className="relative select-none overflow-hidden bg-ink-100"
+        onPointerDown={showAfter ? () => setComparing(true) : undefined}
+        onPointerUp={() => setComparing(false)}
+        onPointerLeave={() => setComparing(false)}
+        onPointerCancel={() => setComparing(false)}
+      >
         {showAfter ? (
           <>
             <Photo
               src={afterSrc}
-              alt="Simulated result with the recommended treatment"
+              alt="Simulated preview of your selected areas"
               reveal
             />
+            {/* While held, lay the original over the result for a direct compare. */}
+            {comparing && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={beforeSrc}
+                alt=""
+                draggable={false}
+                className="absolute inset-0 size-full object-cover"
+              />
+            )}
             <Badge />
+            {!comparing && (
+              <span className="absolute right-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-medium text-white">
+                Hold to compare
+              </span>
+            )}
           </>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 px-3 text-center">
@@ -83,8 +107,8 @@ export function BeforeAfter({
             )}
           </div>
         )}
-        <Caption side="right" accent>
-          With treatment
+        <Caption side="right" accent={!comparing}>
+          {comparing ? "Before" : "With treatment"}
         </Caption>
       </div>
     </div>
@@ -108,8 +132,10 @@ function Photo({
       alt={alt}
       draggable={false}
       onLoad={() => setLoaded(true)}
-      className={`absolute inset-0 size-full object-cover transition-opacity duration-500 ${
-        reveal && !loaded ? "opacity-0" : "opacity-100"
+      className={`absolute inset-0 size-full object-cover transition-all duration-700 ease-out ${
+        reveal && !loaded
+          ? "scale-[1.03] opacity-0 blur-[3px]"
+          : "scale-100 opacity-100 blur-0"
       }`}
     />
   );
