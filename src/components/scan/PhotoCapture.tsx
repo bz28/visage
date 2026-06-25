@@ -195,7 +195,7 @@ export function PhotoCapture({
           <div className="absolute bottom-0 left-0 right-0 rounded-b-2xl bg-gradient-to-t from-black/60 to-transparent px-4 pb-3 pt-8 text-center">
             <p className="text-sm font-medium text-white drop-shadow">
               {view === "front"
-                ? "Look straight on and fit your face in the oval."
+                ? "Fit your face in the oval — relaxed, closed mouth, no teeth."
                 : instruction}
             </p>
           </div>
