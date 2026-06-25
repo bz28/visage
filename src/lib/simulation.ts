@@ -57,6 +57,22 @@ export function isSimulatable(area: string): area is SimulatableArea {
   return (SIMULATABLE as readonly string[]).includes(area);
 }
 
+/**
+ * Areas we can simulate from a PROFILE photo — projection treatments whose real
+ * effect shows from the side. Nose graduates from discuss-only (front) to
+ * simulatable here. CLINICAL assumptions — the directions in AREA_EDIT_PROFILE
+ * are pending surgeon review (docs/surgeon-calibration.md).
+ */
+export const PROFILE_AREAS = ["chin", "jawline", "nose"] as const;
+export type ProfileArea = (typeof PROFILE_AREAS)[number];
+
+export function isProfileArea(area: string): area is ProfileArea {
+  return (PROFILE_AREAS as readonly string[]).includes(area);
+}
+
+/** Everything the region masks / composite can paint: front areas + nose. */
+export type EditableArea = SimulatableArea | "nose";
+
 const AREA_EDIT: Record<SimulatableArea, string> = {
   lips: "add dermal-filler fullness to the lips",
   chin: "add dermal filler to the chin for a more defined, balanced lower face",
@@ -67,6 +83,14 @@ const AREA_EDIT: Record<SimulatableArea, string> = {
     "gently soften the nasolabial folds (the lines from the nose to the mouth corners) with subtle filler support — ease them, do NOT erase them",
   marionette:
     "gently soften the marionette lines (from the mouth corners toward the chin) with subtle filler support and lightly lift the mouth corners — ease them, do NOT flatten the lower face",
+};
+
+// Profile edit directions — projection treatments as they read from the side.
+// CLINICAL PLACEHOLDERS pending surgeon review (docs/surgeon-calibration.md).
+const AREA_EDIT_PROFILE: Record<ProfileArea, string> = {
+  chin: "add dermal filler to the chin to project it slightly forward for a more balanced profile",
+  jawline: "add dermal filler along the jaw to sharpen the angle and soften the pre-jowl area",
+  nose: "subtly straighten the nasal bridge, ease any dorsal hump, and gently support the tip — a non-surgical refinement, never a different nose",
 };
 
 // Assert the actual observed mouth state — far stronger than a generic "keep it
@@ -106,6 +130,20 @@ export function buildCombinedPrompt(
     `Keep each change subtle and optimal (about one syringe each). Change ONLY ` +
     `these areas — nothing else. ${mouthRule(areas.includes("lips"), mouthOpen)}` +
     PRESERVE_RULE
+  );
+}
+
+/**
+ * The profile combined result: projection areas (chin / jaw / nose) edited from
+ * the side, where their real effect shows. No mouth rule (lips aren't a profile
+ * area); the composite locks everything outside the treated regions.
+ */
+export function buildProfilePrompt(areas: ProfileArea[]): string {
+  const edits = areas.map((a) => AREA_EDIT_PROFILE[a]).join("; ");
+  return (
+    `Edit this profile (side-view) photo to show a natural dermal-filler result: ` +
+    `${edits}. Keep each change subtle and optimal. Change ONLY these areas — ` +
+    `nothing else. ${PRESERVE_RULE}`
   );
 }
 

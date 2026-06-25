@@ -1,6 +1,6 @@
 import { detectFace, KEY, type Pt } from "./landmarks";
 import { paintAreaRegion } from "./face-regions";
-import type { SimulatableArea } from "./simulation";
+import type { EditableArea } from "./simulation";
 
 /**
  * Lock identity by force: take the AI-generated edit but keep ONLY the treated
@@ -54,7 +54,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 export async function compositeAreas(
   originalDataUrl: string,
   originalLm: Pt[],
-  areas: SimulatableArea[],
+  areas: EditableArea[],
   generatedDataUrl: string,
   width: number,
   height: number,

@@ -37,10 +37,15 @@ Where does "overdone" start for each — and which changes only show in profile?
 
 ## What we *show* vs. only *discuss*
 
-We render a front-photo before/after for: **lips, chin, jawline, cheeks,
-nasolabial, marionette**. We discuss but don't simulate **nose** (profile +
-highest-risk), **under-eye**, **temples** (subtle / risky). Agree? Anything we
-should never simulate — or any common filler area we're missing?
+**Front photo:** we render a before/after for **lips, chin, jawline, cheeks,
+nasolabial, marionette**. We discuss but don't simulate **under-eye**, **temples**
+(subtle / risky), or the **nose** head-on.
+
+**Profile photo** (if given): we render a before/after for the projection areas —
+**chin** (projects forward), **jawline** (sharper angle + pre-jowl), and **nose**
+(straighten bridge, ease a hump, support the tip). Are these directions right,
+and is the nose conservative enough? Anything we should never simulate even in
+profile?
 
 ## A few specifics
 

@@ -125,6 +125,17 @@ async function main() {
       seeRead.waitFor({ timeout: 30_000 }).catch(() => {}),
     ]);
     if (await useAnyway.isVisible().catch(() => false)) await useAnyway.click();
+
+    // Add a side photo (reuse the fixture) so the profile before/after path runs.
+    log("adding a side photo for the profile path…");
+    await page.getByRole("button", { name: /^Add$/ }).first().click();
+    await page.locator('input[type="file"]').last().setInputFiles(FIXTURE);
+    const useAnyway2 = page.getByRole("button", { name: /Use anyway/i });
+    await Promise.race([
+      useAnyway2.waitFor({ timeout: 20_000 }).catch(() => {}),
+      seeRead.waitFor({ timeout: 20_000 }).catch(() => {}),
+    ]);
+    if (await useAnyway2.isVisible().catch(() => false)) await useAnyway2.click();
     await seeRead.click();
 
     log("waiting for the read…");
@@ -166,6 +177,16 @@ async function main() {
       fail(`combined preview did not render (dims=${JSON.stringify(dims)})`);
     }
     log(`combined before/after rendered (${dims.w}×${dims.h}).`);
+
+    // The profile (two-angle) before/after also renders from the side photo.
+    log("waiting for the profile before/after…");
+    await page.getByText("Profile", { exact: true }).waitFor({ timeout: 30_000 });
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll('img[alt*="Simulated result"]').length >= 2,
+      { timeout: 60_000 },
+    );
+    log("front + profile before/afters both rendered ✓");
 
     if (consoleErrors.length) {
       fail(`console errors:\n  - ${consoleErrors.join("\n  - ")}`);
