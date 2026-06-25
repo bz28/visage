@@ -16,7 +16,7 @@ const bodySchema = z.object({
   images: z
     .array(
       z.object({
-        view: z.enum(["front", "profile", "threequarter"]),
+        view: z.enum(["front", "profile"]),
         base64: z.string().min(1),
       }),
     )
