@@ -141,8 +141,18 @@ export function buildCombinedPrompt(
   );
 }
 
-// Human names for the finish prompt (which talks about the area, not an edit).
-const FINISH_LABEL: Partial<Record<SimulatableArea, string>> = {
+// Areas eligible for the texture "+finish" — only the soft-tissue volume areas
+// where a sheen reads (lips today; cheeks once they're warped). NOT chin/jaw/nose
+// (bony projection has no filler sheen) or folds (a crease, not added volume).
+export const FINISH_AREAS = ["lips", "cheeks"] as const;
+export type FinishArea = (typeof FINISH_AREAS)[number];
+export function isFinishArea(area: string): area is FinishArea {
+  return (FINISH_AREAS as readonly string[]).includes(area);
+}
+
+// Human names for the finish prompt — total over FinishArea, so an unmapped area
+// is a compile error, not a raw enum key leaking into the prompt.
+const FINISH_LABEL: Record<FinishArea, string> = {
   lips: "lips",
   cheeks: "cheeks",
 };
@@ -156,10 +166,10 @@ const FINISH_LABEL: Partial<Record<SimulatableArea, string>> = {
  * re-locks everything outside the area, so even the texture pass can't drift it.
  */
 export function buildFinishPrompt(
-  areas: SimulatableArea[],
+  areas: FinishArea[],
   mouthOpen?: boolean,
 ): string {
-  const names = areas.map((a) => FINISH_LABEL[a] ?? a).join(" and the ");
+  const names = areas.map((a) => FINISH_LABEL[a]).join(" and the ");
   return (
     `This photo is a dermal-filler PREVIEW: the ${names} have already been made ` +
     `fuller by reshaping. Add ONLY subtle, photorealistic filler texture to the ` +

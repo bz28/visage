@@ -247,7 +247,9 @@ export function ScanFlow() {
             AbortSignal.timeout(65_000),
           ]),
         });
-        const data: { image?: string } = await res.json();
+        // A non-2xx (e.g. a platform 500 returning HTML) would make res.json()
+        // throw — treat it as a give-up like any other failure.
+        const data: { image?: string } = res.ok ? await res.json() : {};
         // Guard BEFORE any write: if the user moved on (toggle / Start over /
         // re-scan) the cache + frontWarpRef now belong to a DIFFERENT photo, and
         // writing this photo's texture into them would bleed one face onto another.
@@ -329,7 +331,10 @@ export function ScanFlow() {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ image: f.dataUrl, areas, mouthOpen }),
         });
-        const data: { image?: string; fallback?: boolean } = await res.json();
+        // A non-2xx body isn't our JSON contract — treat as a fallback.
+        const data: { image?: string; fallback?: boolean } = res.ok
+          ? await res.json()
+          : {};
         if (!data.image) break; // server fell back (no key / refusal / error)
         // Prepare once: this runs the harness (mouth-drift) + caches the detect.
         const prepared = await prepareComposite(
