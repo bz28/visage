@@ -84,7 +84,7 @@ AI isn't one thing. Three distinct kinds, in three roles:
 | Treatment | Tool | Why |
 |---|---|---|
 | Chin / jaw / nose (projection) | **Warp** | Pure shape — real pixels, calibratable, multi-angle. |
-| Lips (fullness) | **Warp** (+ generative finish later) | Everting the vermillion border is a shape change — identity-locked, no shape/mouth drift. A light generative sheen finish is a future enhancement (needs a live image-gen key to evaluate). |
+| Lips (fullness) | **Warp + generative texture finish** | Everting the vermillion border is a shape change — identity-locked, no shape/mouth drift. A low-strength generative *texture* pass then adds the filler sheen, identity-locked to the lip region (built; see Status). |
 | Cheeks (volume) | **Warp + generative finish** | Shape is a warp; the new highlight needs rendering. |
 | Under-eye / tear trough | **Generative** | Filling a *shadow* is a lighting change, not a shape change. |
 | Botox / tox (softening lines) | **Generative** | A texture/appearance change. |
@@ -138,12 +138,18 @@ wedge.
   **closed mouth** (the gated norm) — on an open/smiling mouth the model tends to
   nudge the smile and the harness rejects it, so attempting it would just burn a
   call. Debounced + cached (one call per settled view).
-  - *Validated:* the route+prompt produce texture with a real key; the
-    warp→finish→identity-lock pipeline produces a clean locked result; the wired
-    trigger + fail-silent + closed-mouth gate all verified in the live flow.
-  - *Known gap (needs a closed-mouth fixture):* the e2e fixture is open-mouthed,
-    so the closed-mouth *swap-in* isn't covered by the automated e2e yet — add a
-    closed-mouth fixture to assert it. Tracked here, not silently skipped.
+  - *Validated (real key):* the warp→finish→identity-lock pipeline produces a
+    clean locked result on a **closed-mouth** fixture (`test/fixtures/
+    test-face-closed.jpg`, regenerable via `scripts/make-closed-mouth-fixture.mjs`)
+    — MediaPipe detects it, the mouth reads closed, and the finish locks in
+    (`FINISH LOCKED ✓`) with natural, fuller-textured lips and identity preserved.
+    The wired trigger + fail-silent + closed-mouth gate are verified in the live
+    flow (open mouth → harness rejects → keeps the warp; closed mouth → texture
+    lands).
+  - *Remaining (small):* the automated e2e runs under the image-gen mock (so the
+    finish echoes — no real texture to assert) and on the open-mouth fixture (so
+    the finish is correctly skipped). A finish-path e2e using the closed-mouth
+    fixture would add wiring coverage — nice-to-have, not a correctness risk.
 - **Next:** calibration of every warp magnitude **and** the finish texture
   strength to the surgeon's real before/after photos (`docs/surgeon-calibration.md`);
   a closed-mouth e2e fixture; optionally a cross-fade on the finish swap.
