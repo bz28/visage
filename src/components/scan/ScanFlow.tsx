@@ -89,10 +89,11 @@ export function ScanFlow() {
   // Bumped on every recompose so a slow paste+warp from an old toggle can't land
   // after a newer one (recompose is async now — the warp loads an image).
   const recomposeId = useRef(0);
-  // The background texture-finish: a debounce timer + a one-entry cache (keyed by
-  // the warp image it finished) so re-toggling a finished view costs no API call.
+  // The background texture-finish: a debounce timer + the cached generative
+  // texture output for THIS photo (fetched at most once; re-applied locally on
+  // every toggle). Cleared on re-analyze + reset.
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const finishCacheRef = useRef<{ key: string; src: string } | null>(null);
+  const finishCacheRef = useRef<{ image: string } | null>(null);
 
   // The optional PROFILE (side-view) before/after — projection areas (chin / jaw
   // / nose) shown from the side, where their real effect reads. Only when a
@@ -193,16 +194,15 @@ export function ScanFlow() {
     if (lipsOn && !isMouthOpen(src.lm)) void finishFront(base, rid);
   }
 
-  // Background "+finish": send the warp result to the generative model for a
-  // texture-only pass, identity-lock its lip region back onto the warp, and swap
-  // it in. Debounced + cached so toggling doesn't spam paid calls; fail-silent so
-  // any error/refusal/timeout just leaves the (already-shown) warp result.
+  // Background "+finish": add the photoreal lip texture the warp can't, and swap
+  // it in. The expensive part — the generative texture — is fetched at most ONCE
+  // per photo and cached: the lip warp is deterministic and the texture only
+  // depends on the lips, so toggling cheeks/chin re-applies the cached texture
+  // LOCALLY (no API). Fail-silent: any error/refusal/timeout keeps the warp.
   async function finishFront(warpResult: string, rid: number) {
-    // Cache: the finish is a pure function of its input image. Re-toggling back
-    // to a view we already finished reuses it with no call.
-    if (finishCacheRef.current?.key === warpResult) {
-      if (rid === recomposeId.current)
-        setCombinedSrc(finishCacheRef.current.src);
+    const cached = finishCacheRef.current?.image;
+    if (cached) {
+      void applyFinish(warpResult, cached, rid); // no API — re-lock locally
       return;
     }
     if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
@@ -225,36 +225,44 @@ export function ScanFlow() {
         });
         const data: { image?: string } = await res.json();
         if (!data.image || rid !== recomposeId.current) return;
-        // Identity-lock the texture pass to the lip region of the warp result, so
-        // it can add sheen but cannot move the shape we already set. The harness
-        // rejects any mouth/expression drift — on a relaxed closed mouth (what we
-        // gate for) the texture lands; if it drifts we keep the warp (fail-silent).
-        const src = frontWarpRef.current;
-        if (!src) return;
-        const wimg = await loadImage(warpResult);
-        const det = await detectFace(wimg, src.width, src.height);
-        if (det.status !== "ok" || !det.landmarks) return;
-        const prep = await prepareComposite(
-          warpResult,
-          det.landmarks,
-          ["lips"],
-          data.image,
-          src.width,
-          src.height,
-        );
-        if (!prep.ok || !prep.prep) {
-          // Expected on an open/smiling mouth — keep the warp, note for QA only.
-          console.debug(`[finish] kept warp: ${prep.reason}`);
-          return;
-        }
-        const locked = pasteComposite(prep.prep, ["lips"]);
-        if (!locked || rid !== recomposeId.current) return;
-        finishCacheRef.current = { key: warpResult, src: locked };
-        setCombinedSrc(locked);
+        finishCacheRef.current = { image: data.image };
+        await applyFinish(warpResult, data.image, rid);
       } catch {
         // fail-silent — the warp result is already on screen
       }
     }, 450);
+  }
+
+  // Identity-lock a (cached or fresh) texture output onto the current warp base:
+  // paste ONLY its lip region over the warp, so it adds sheen but cannot move the
+  // shape we already set. The mouth-drift harness rejects expression drift — on a
+  // relaxed closed mouth the texture lands; otherwise we keep the warp.
+  async function applyFinish(warpResult: string, aiImage: string, rid: number) {
+    const src = frontWarpRef.current;
+    if (!src) return;
+    try {
+      const wimg = await loadImage(warpResult);
+      const det = await detectFace(wimg, src.width, src.height);
+      if (det.status !== "ok" || !det.landmarks) return;
+      const prep = await prepareComposite(
+        warpResult,
+        det.landmarks,
+        ["lips"],
+        aiImage,
+        src.width,
+        src.height,
+      );
+      if (!prep.ok || !prep.prep) {
+        // Expected on an open/smiling mouth — keep the warp, note for QA only.
+        console.debug(`[finish] kept warp: ${prep.reason}`);
+        return;
+      }
+      const locked = pasteComposite(prep.prep, ["lips"]);
+      if (!locked || rid !== recomposeId.current) return;
+      setCombinedSrc(locked);
+    } catch {
+      // fail-silent — the warp result is already on screen
+    }
   }
 
   // Generate the combined "after" once, retrying if the harness rejects it
@@ -452,6 +460,9 @@ export function ScanFlow() {
       // Start with every recommended area selected (the full plan).
       applySelection(new Set(assessment.areas.map((a) => a.area)));
       frontPrepRef.current = null;
+      // New photo → the prior photo's cached lip texture no longer applies.
+      if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
+      finishCacheRef.current = null;
       setCombinedSrc(null);
       setStep("result");
 
