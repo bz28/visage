@@ -132,6 +132,10 @@ export function ScanFlow() {
   // toggle landing first.
   async function recompose(sel: Set<string>) {
     const src = frontWarpRef.current;
+    // Bump FIRST, so clearing the selection (or any newer toggle) invalidates a
+    // warp still suspended on its loadImage — otherwise that stale warp resumes
+    // and clobbers the blank the user just asked for.
+    const rid = ++recomposeId.current;
     const simSel = [...sel].filter(isSimulatable);
     if (simSel.length === 0) {
       setCombinedSrc(null);
@@ -139,7 +143,6 @@ export function ScanFlow() {
     }
     const genSel = simSel.filter((a) => !isFrontWarpArea(a));
     const warpSel = simSel.filter(isFrontWarpArea);
-    const rid = ++recomposeId.current;
 
     // Generative base (lips/cheeks/folds) pasted onto the original — or the
     // untouched original if nothing generative is selected / it's not ready yet.

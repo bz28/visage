@@ -235,6 +235,25 @@ async function main() {
       `warp identity-lock verified (eye Δ${lock.eye.toFixed(2)} < projection Δ${lock.projection.toFixed(2)}) ✓`,
     );
 
+    // Toggle every area OFF → the "after" preview must clear. Guards the
+    // empty-selection path where an in-flight (async) chin/jaw warp could
+    // otherwise resume and clobber the blank the patient just asked for.
+    log("toggling all areas off…");
+    const switches = page.locator('button[role="switch"]');
+    const count = await switches.count();
+    for (let i = 0; i < count; i++) {
+      const sw = switches.nth(i);
+      if ((await sw.getAttribute("aria-checked")) === "true") {
+        await sw.click();
+      }
+    }
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll('img[alt*="Simulated preview"]').length === 0,
+      { timeout: 15_000 },
+    );
+    log("all-off clears the preview ✓");
+
     if (consoleErrors.length) {
       fail(`console errors:\n  - ${consoleErrors.join("\n  - ")}`);
     }
