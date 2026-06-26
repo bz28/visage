@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CLINIC } from "@/lib/clinic";
 import { AREA_LABELS } from "@/lib/assessment-schema";
+import { isValidContact } from "@/lib/contact";
 import { Button } from "@/components/ui/Button";
 
 interface Props {
@@ -17,9 +18,17 @@ export function BookConsult({ interests, onDone }: Props) {
   const [status, setStatus] = useState<"idle" | "saving" | "done" | "error">(
     "idle",
   );
+  // Inline "email or phone" feedback, shown only after a failed submit attempt
+  // so we don't nag while they're still typing.
+  const [contactError, setContactError] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!isValidContact(contact)) {
+      setContactError(true);
+      return;
+    }
+    setContactError(false);
     setStatus("saving");
     try {
       const res = await fetch("/api/leads", {
@@ -114,10 +123,23 @@ export function BookConsult({ interests, onDone }: Props) {
         <input
           required
           value={contact}
-          onChange={(e) => setContact(e.target.value)}
+          onChange={(e) => {
+            setContact(e.target.value);
+            if (contactError) setContactError(false);
+          }}
+          aria-invalid={contactError}
           placeholder="you@email.com or (555) 555-5555"
-          className="rounded-lg border border-ink-300 px-3 py-2.5 font-normal text-foreground placeholder:text-ink-400 transition-colors focus:border-[var(--accent)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/25"
+          className={`rounded-lg border px-3 py-2.5 font-normal text-foreground placeholder:text-ink-400 transition-colors focus:outline-none focus:ring-2 ${
+            contactError
+              ? "border-red-400 focus:border-red-500 focus:ring-red-500/25"
+              : "border-ink-300 focus:border-[var(--accent)] focus:ring-[var(--accent)]/25"
+          }`}
         />
+        {contactError && (
+          <span role="alert" className="text-xs font-normal text-red-600">
+            So the clinic can reach you, enter a valid email or phone number.
+          </span>
+        )}
       </label>
       <label className="flex flex-col gap-1.5 text-sm font-medium text-ink-600">
         Anything you&apos;d like them to know (optional)
