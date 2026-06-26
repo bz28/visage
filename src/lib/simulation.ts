@@ -71,6 +71,21 @@ export function isProfileArea(area: string): area is ProfileArea {
   return (PROFILE_AREAS as readonly string[]).includes(area);
 }
 
+/**
+ * On the FRONT photo too, chin + jawline are rendered by the geometric warp
+ * (projection), not the generative model — the angle-aware warp gives a defined
+ * jawline / projected chin that reads head-on, identity-locked and free, while
+ * the generative handles the surface/volume areas (lips, cheeks, folds). Lips —
+ * the v1 wedge — are untouched by this: a lips-only patient never hits the warp.
+ */
+export const FRONT_WARP_AREAS = ["chin", "jawline"] as const;
+// A subtype of BOTH SimulatableArea and ProfileArea, so .filter() narrows
+// cleanly for the front warp (which feeds warpAreas, typed ProfileArea[]).
+export type FrontWarpArea = (typeof FRONT_WARP_AREAS)[number];
+export function isFrontWarpArea(area: string): area is FrontWarpArea {
+  return (FRONT_WARP_AREAS as readonly string[]).includes(area);
+}
+
 /** Everything the region masks / composite can paint: front areas + nose. */
 export type EditableArea = SimulatableArea | "nose";
 
