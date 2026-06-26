@@ -49,3 +49,8 @@ next-env.d.ts
 /sim-*.png
 /fix-*.png
 /mock-*.png
+
+# Claude Code scheduled-task runtime state (autonomous cron) — machine-local,
+# not source. The durable cron definition + its lock live here.
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks.json
