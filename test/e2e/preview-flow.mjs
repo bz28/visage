@@ -90,6 +90,16 @@ async function main() {
     });
     page.on("pageerror", (err) => consoleErrors.push(`pageerror: ${err.message}`));
 
+    // Count the texture-finish calls so we can assert the closed-mouth GATE:
+    // the finish must NOT fire on this open-mouth fixture (it would just burn a
+    // paid call to fail the identity-lock harness). See finishFront in ScanFlow.
+    let finishCalls = 0;
+    page.on("request", (req) => {
+      if (req.method() !== "POST" || !req.url().includes("/api/simulate")) return;
+      const body = req.postData() || "";
+      if (body.includes("finishAreas")) finishCalls++;
+    });
+
     log("loading app…");
     await page.goto(BASE, { waitUntil: "networkidle", timeout: 90_000 });
 
@@ -277,6 +287,15 @@ async function main() {
     log(
       `front lip warp verified (eye Δ${lips.eye.toFixed(2)} < lip Δ${lips.lip.toFixed(2)}) ✓`,
     );
+
+    // Closed-mouth GATE: this fixture is open-mouthed, so the texture finish must
+    // NOT have fired (it would burn a paid call to fail the identity-lock harness).
+    // Give any debounced finish a beat to (not) fire, then assert zero calls.
+    await page.waitForTimeout(800);
+    if (finishCalls !== 0) {
+      fail(`finish gate broken: ${finishCalls} finish call(s) on an open mouth`);
+    }
+    log("texture-finish correctly skipped on open mouth (0 calls) ✓");
 
     // Toggle every area OFF → the "after" preview must clear. Guards the
     // empty-selection path where an in-flight (async) chin/jaw warp could

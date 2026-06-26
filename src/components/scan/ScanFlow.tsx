@@ -86,16 +86,23 @@ export function ScanFlow() {
     height: number;
     dataUrl: string;
   } | null>(null);
-  // Bumped on every recompose so a slow paste+warp from an old toggle can't land
-  // after a newer one (recompose is async now — the warp loads an image).
+  // Bumped on every recompose AND on reset()/analyze(), so a slow paste+warp or
+  // background finish from an old toggle/photo can't land after a newer one —
+  // critical because these async paths handle face photos (a stale finish from
+  // photo A must never composite onto photo B).
   const recomposeId = useRef(0);
   // The background texture-finish: a debounce timer + the cached generative
   // texture output for THIS photo (fetched at most once; re-applied locally on
   // every toggle). Cleared on re-analyze + reset.
+  // finishInFlightRef latches a paid call so concurrent toggles can't fire a
+  // second one; finishAbortRef lets reset()/analyze() actually cancel an
+  // in-flight request rather than just ignore its result.
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // { image } = cached texture to re-apply; { image: null } = gave up (don't
   // re-call); null = not yet attempted for this photo.
   const finishCacheRef = useRef<{ image: string | null } | null>(null);
+  const finishInFlightRef = useRef(false);
+  const finishAbortRef = useRef<AbortController | null>(null);
 
   // The optional PROFILE (side-view) before/after — projection areas (chin / jaw
   // / nose) shown from the side, where their real effect reads. Only when a
@@ -211,9 +218,17 @@ export function ScanFlow() {
       if (cache.image) void applyFinish(warpResult, cache.image, rid);
       return;
     }
+    if (finishInFlightRef.current) return; // a paid call already running this photo
     if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
     finishTimerRef.current = setTimeout(async () => {
-      if (rid !== recomposeId.current) return; // superseded while debouncing
+      // Re-check both guards at fire time (a newer toggle or a reset/analyze may
+      // have landed during the debounce).
+      if (rid !== recomposeId.current || finishInFlightRef.current) return;
+      finishInFlightRef.current = true;
+      // Abortable so reset()/analyze() can cancel the prior photo's call outright
+      // (not just ignore its result); 65s ceiling on a hung request.
+      const controller = new AbortController();
+      finishAbortRef.current = controller;
       try {
         const res = await fetch("/api/simulate", {
           method: "POST",
@@ -227,20 +242,30 @@ export function ScanFlow() {
               ? isMouthOpen(frontWarpRef.current.lm)
               : undefined,
           }),
-          signal: AbortSignal.timeout(65_000),
+          signal: AbortSignal.any([
+            controller.signal,
+            AbortSignal.timeout(65_000),
+          ]),
         });
         const data: { image?: string } = await res.json();
+        // Guard BEFORE any write: if the user moved on (toggle / Start over /
+        // re-scan) the cache + frontWarpRef now belong to a DIFFERENT photo, and
+        // writing this photo's texture into them would bleed one face onto another.
+        if (rid !== recomposeId.current) return;
         if (!data.image) {
           finishCacheRef.current = { image: null }; // give up — don't retry
           return;
         }
         finishCacheRef.current = { image: data.image };
-        if (rid !== recomposeId.current) return;
         await applyFinish(warpResult, data.image, rid);
       } catch {
-        // Transient (timeout/network) — latch give-up to bound paid calls; the
-        // warp result is already on screen. A re-analyze clears it for a retry.
-        finishCacheRef.current = { image: null };
+        // Transient (timeout/network/abort) — latch give-up to bound paid calls,
+        // but only for the photo that's still current. The warp is already shown;
+        // a re-analyze clears the latch for a retry.
+        if (rid === recomposeId.current) finishCacheRef.current = { image: null };
+      } finally {
+        finishInFlightRef.current = false;
+        if (finishAbortRef.current === controller) finishAbortRef.current = null;
       }
     }, 450);
   }
@@ -472,9 +497,11 @@ export function ScanFlow() {
       // Start with every recommended area selected (the full plan).
       applySelection(new Set(assessment.areas.map((a) => a.area)));
       frontPrepRef.current = null;
-      // New photo → the prior photo's cached lip texture no longer applies.
-      if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
-      finishCacheRef.current = null;
+      // New photo → invalidate any suspended recompose/finish from a prior scan
+      // (so it can't composite the old face onto this one) and drop the prior
+      // photo's cached lip texture + any in-flight call.
+      recomposeId.current++;
+      teardownFinish();
       setCombinedSrc(null);
       setStep("result");
 
@@ -521,6 +548,18 @@ export function ScanFlow() {
     }
   }
 
+  // Cancel + clear all background texture-finish state. Aborting the in-flight
+  // request (not just ignoring it) is what stops a prior photo's call from
+  // resolving into a new scan.
+  function teardownFinish() {
+    if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
+    finishTimerRef.current = null;
+    finishAbortRef.current?.abort();
+    finishAbortRef.current = null;
+    finishInFlightRef.current = false;
+    finishCacheRef.current = null;
+  }
+
   function reset() {
     setIntake(null);
     setPhotos({});
@@ -529,13 +568,13 @@ export function ScanFlow() {
     setError(null);
     setHighlightedArea(null);
     genId.current++; // invalidate any in-flight combined generation
+    recomposeId.current++; // invalidate any suspended recompose/finish too
     setCombinedSrc(null);
     setCombinedFailed(false);
     setCombinedLoading(false);
     frontPrepRef.current = null;
     frontWarpRef.current = null;
-    if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
-    finishCacheRef.current = null;
+    teardownFinish();
     setProfile(null);
     setProfileSrc(null);
     setProfileLoading(false);
