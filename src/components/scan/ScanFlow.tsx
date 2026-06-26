@@ -14,6 +14,7 @@ import {
 import {
   isSimulatable,
   isProfileArea,
+  isFrontWarpArea,
   type SimulatableArea,
   type ProfileArea,
 } from "@/lib/simulation";
@@ -75,6 +76,19 @@ export function ScanFlow() {
   // computed ONCE when the generation lands. Toggling areas re-pastes a subset
   // from this — a pure canvas op, no face-detect — so it's instant.
   const frontPrepRef = useRef<CompositePrep | null>(null);
+  // The front photo + its landmarks, cached so chin/jaw can be WARPED on the
+  // front (projection that reads head-on) on top of the generative lips/cheeks —
+  // mirrors profileWarpRef. dataUrl is the untouched original (the warp base).
+  const frontWarpRef = useRef<{
+    img: HTMLImageElement;
+    lm: Pt[];
+    width: number;
+    height: number;
+    dataUrl: string;
+  } | null>(null);
+  // Bumped on every recompose so a slow paste+warp from an old toggle can't land
+  // after a newer one (recompose is async now — the warp loads an image).
+  const recomposeId = useRef(0);
 
   // The optional PROFILE (side-view) before/after — projection areas (chin / jaw
   // / nose) shown from the side, where their real effect reads. Only when a
@@ -111,19 +125,41 @@ export function ScanFlow() {
     setSelected(next);
   }
 
-  // Re-paste the cached generation down to the currently-selected regions — a
-  // pure canvas op (no face-detect), so toggling is instant and free. Sync, so
-  // there's no out-of-order race; the prep ref is cleared on reset.
-  function recompose(sel: Set<string>) {
-    const prep = frontPrepRef.current;
-    if (!prep) return;
+  // Recompose the front "after" for the current selection: paste the generative
+  // areas (lips / cheeks / folds) from the cached prep, then WARP chin / jaw on
+  // top (their projection reads head-on too). Both are pure on-device ops; the
+  // warp loads the pasted result, so this is async + guarded against a newer
+  // toggle landing first.
+  async function recompose(sel: Set<string>) {
+    const src = frontWarpRef.current;
     const simSel = [...sel].filter(isSimulatable);
     if (simSel.length === 0) {
       setCombinedSrc(null);
       return;
     }
-    const dataUrl = pasteComposite(prep, simSel);
-    if (dataUrl) setCombinedSrc(dataUrl);
+    const genSel = simSel.filter((a) => !isFrontWarpArea(a));
+    const warpSel = simSel.filter(isFrontWarpArea);
+    const rid = ++recomposeId.current;
+
+    // Generative base (lips/cheeks/folds) pasted onto the original — or the
+    // untouched original if nothing generative is selected / it's not ready yet.
+    let base = src?.dataUrl ?? null;
+    const prep = frontPrepRef.current;
+    if (genSel.length && prep) {
+      const pasted = pasteComposite(prep, genSel);
+      if (pasted) base = pasted;
+    }
+    if (!base) return;
+
+    // Warp chin/jaw on top. Reuse the cached original image when the base IS the
+    // original (no generative paste); otherwise decode the pasted base.
+    if (warpSel.length && src) {
+      const img = genSel.length && prep ? await loadImage(base) : src.img;
+      const warped = warpAreas(img, src.lm, warpSel, src.width, src.height);
+      if (warped) base = warped;
+    }
+    if (rid !== recomposeId.current) return; // a newer toggle superseded us
+    setCombinedSrc(base);
   }
 
   // Generate the combined "after" once, retrying if the harness rejects it
@@ -167,7 +203,7 @@ export function ScanFlow() {
         frontPrepRef.current = prep;
         // Paste for the CURRENT selection (the user may have toggled while the
         // generation was running), not just the areas we generated.
-        recompose(selectedRef.current);
+        await recompose(selectedRef.current);
       } else {
         setCombinedFailed(true);
       }
@@ -185,7 +221,7 @@ export function ScanFlow() {
     if (next.has(area)) next.delete(area);
     else next.add(area);
     applySelection(next);
-    if (frontPrepRef.current) recompose(next);
+    if (frontWarpRef.current) void recompose(next);
     // The profile preview (chin / jaw / nose) re-pastes too — but only when a
     // projection area was toggled, so a lips/cheeks toggle doesn't needlessly
     // re-paste the profile panel.
@@ -328,12 +364,30 @@ export function ScanFlow() {
       // while they read the plan.
       const gen = ++genId.current;
       const uniqueAreas = [...new Set(assessment.areas.map((a) => a.area))];
-      void generateCombined(
-        { dataUrl: frontImg.dataUrl, width: w, height: h },
-        landmarks,
-        uniqueAreas.filter(isSimulatable),
-        gen,
-      );
+      // Cache the front warp source so chin/jaw can project on the front too.
+      frontWarpRef.current = {
+        img,
+        lm: landmarks,
+        width: w,
+        height: h,
+        dataUrl: frontImg.dataUrl,
+      };
+      // The generative model handles the surface/volume areas; chin + jawline are
+      // warped (projection that reads head-on). If only chin/jaw are recommended
+      // there's no generative work — just the instant, free warp.
+      const genFront = uniqueAreas
+        .filter(isSimulatable)
+        .filter((a) => !isFrontWarpArea(a));
+      if (genFront.length > 0) {
+        void generateCombined(
+          { dataUrl: frontImg.dataUrl, width: w, height: h },
+          landmarks,
+          genFront,
+          gen,
+        );
+      } else {
+        void recompose(selectedRef.current);
+      }
 
       // If a side photo was provided, also generate a profile before/after for
       // the projection areas (chin / jaw / nose) it covers.
@@ -360,6 +414,7 @@ export function ScanFlow() {
     setCombinedFailed(false);
     setCombinedLoading(false);
     frontPrepRef.current = null;
+    frontWarpRef.current = null;
     setProfile(null);
     setProfileSrc(null);
     setProfileLoading(false);
