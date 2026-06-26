@@ -264,8 +264,14 @@ export function ScanFlow() {
         // a re-analyze clears the latch for a retry.
         if (rid === recomposeId.current) finishCacheRef.current = { image: null };
       } finally {
-        finishInFlightRef.current = false;
-        if (finishAbortRef.current === controller) finishAbortRef.current = null;
+        // Only release the latch if we still OWN it. After a reset/re-scan,
+        // teardownFinish already cleared it (and a newer photo's finish may have
+        // re-latched) — clearing unconditionally here would free the new photo's
+        // latch and let a duplicate paid call slip through.
+        if (finishAbortRef.current === controller) {
+          finishInFlightRef.current = false;
+          finishAbortRef.current = null;
+        }
       }
     }, 450);
   }
