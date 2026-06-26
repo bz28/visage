@@ -88,7 +88,10 @@ export function BeforeAfter({
                 className="absolute inset-0 size-full object-cover"
               />
             )}
-            <Badge />
+            {/* Hide the "Simulated" badge while held to compare — the original
+                is overlaid on top, and labeling the real photo "Simulated" would
+                contradict our simulation-vs-real framing. */}
+            {!comparing && <Badge />}
             {!comparing && (
               <span className="absolute right-3 top-3 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-medium text-white">
                 Hold to compare
