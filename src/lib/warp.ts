@@ -1,4 +1,4 @@
-import { KEY, REGIONS, type Pt } from "./landmarks";
+import { KEY, type Pt } from "./landmarks";
 import type { ProfileArea } from "./simulation";
 
 /**
@@ -58,11 +58,16 @@ const AREA_WARP: Record<ProfileArea, { movers: number[]; mag: number }> = {
 };
 
 // Landmarks held fixed so the warp stays local to the treated region: eyes,
-// brow, forehead, cheekbones. Without these the whole face would drift.
+// brow, forehead, cheekbones — AND the mouth. The lips are anchored so the chin
+// (and jaw) projection can't tug the lower lip: without these pins the chin's
+// displacement field bleeds up into the lip region and visibly distorts it, even
+// though no lip point is a mover. (Only the PROJECTION warp uses these anchors —
+// the lip warp has its own control set, so lip fullness is unaffected.)
 const ANCHORS = [
   KEY.eyeOuterR, KEY.eyeOuterL, KEY.eyeInnerR, KEY.eyeInnerL,
   KEY.trichion, KEY.glabella, KEY.nasion, KEY.zygionR, KEY.zygionL,
   127, 356, 234, 454,
+  KEY.upperLipTop, KEY.lowerLipBottom, KEY.mouthCornerR, KEY.mouthCornerL,
 ];
 
 /** A control point: where it is, and how far it moves (0 for anchors). */
@@ -198,84 +203,18 @@ export function warpAreas(
   if (areas.length === 0) return null;
   // Fail closed if the landmarks buildControls dereferences are missing (sparse
   // detection) — return null so the caller keeps the untouched original, rather
-  // than throwing. Mirrors warpLips's guard.
+  // than throwing.
   if (!lm[KEY.glabella] || !lm[KEY.menton] || !lm[KEY.noseTip]) return null;
   const { controls, movers, scale } = buildControls(lm, areas);
   return renderWarp(img, controls, movers, scale, width, height);
-}
-
-// Lip-fullness warp. Filler adds height + a little eversion — the vermillion
-// border rolls outward, the lips read fuller — WITHOUT widening the mouth. So we
-// ANCHOR the mouth corners (and the face around the mouth) and push the rest of
-// the lip border radially outward from the mouth centre; the anchored corners
-// taper the sides to ~0 so the mouth keeps its width.
-//
-// LIP_MAG is a CLINICAL PLACEHOLDER (fraction of lip height) — my best-judgement
-// default for a natural ~1-syringe result, pending surgeon calibration (see
-// docs/surgeon-calibration.md, lips).
-const LIP_MAG = 0.22;
-const LIP_MOVERS = REGIONS.outerLip.filter(
-  (i) => i !== KEY.mouthCornerR && i !== KEY.mouthCornerL,
-);
-const LIP_ANCHORS = [
-  KEY.mouthCornerR, KEY.mouthCornerL, KEY.subnasale, KEY.noseTip,
-  KEY.alarR, KEY.alarL, KEY.menton, KEY.gonionR, KEY.gonionL,
-  KEY.eyeOuterR, KEY.eyeOuterL,
-];
-
-function buildLipControls(lm: Pt[]): {
-  controls: Control[];
-  movers: Control[];
-  scale: number;
-} {
-  const lipPts = REGIONS.outerLip.map((i) => lm[i]).filter(Boolean);
-  const centre = mul(
-    lipPts.reduce((a, p) => add(a, p), { x: 0, y: 0 }),
-    1 / Math.max(1, lipPts.length),
-  );
-  // Lip height (cupid's bow → lower-lip bottom) scales the displacement + mask.
-  const scale = len(sub(lm[KEY.upperLipTop], lm[KEY.lowerLipBottom])) || 30;
-  const controls: Control[] = [];
-  for (const i of LIP_ANCHORS) {
-    if (lm[i]) controls.push({ p: lm[i], d: { x: 0, y: 0 } });
-  }
-  const movers: Control[] = [];
-  for (const i of LIP_MOVERS) {
-    const p = lm[i];
-    if (!p) continue;
-    // Radially outward from the mouth centre — upper border up, lower down.
-    const dir = norm(sub(p, centre));
-    const c = { p, d: mul(dir, LIP_MAG * scale) };
-    controls.push(c);
-    movers.push(c);
-  }
-  return { controls, movers, scale };
-}
-
-/**
- * Warp the lips fuller (identity-locked, on-device, no API). The geometric
- * "reshape" half of a lip simulation — the patient's own lips, made fuller.
- * Returns a PNG data URL, or null if the lips can't be located.
- */
-export function warpLips(
-  img: HTMLImageElement,
-  lm: Pt[],
-  width: number,
-  height: number,
-): string | null {
-  if (!lm[KEY.upperLipTop] || !lm[KEY.lowerLipBottom]) return null;
-  const { controls, movers, scale } = buildLipControls(lm);
-  // Higher IDW power + a wider mask (relative to the small lip scale) so the
-  // eversion stays tight to the lips but the paste region still covers them.
-  return renderWarp(img, controls, movers, scale, width, height, 2.6, 1.1, 0.45);
 }
 
 /**
  * The shared warp render: build a smooth IDW displacement field from the control
  * points, push the photo through a piecewise-affine grid, then paste only the
  * moved region (feathered around the movers) back onto the ORIGINAL — so
- * everything outside is the patient's exact pixels. Used by both the projection
- * warp (chin/jaw/nose) and the lip warp.
+ * everything outside is the patient's exact pixels. Drives the projection warp
+ * (chin / jaw / nose) on the profile.
  */
 function renderWarp(
   img: HTMLImageElement,
