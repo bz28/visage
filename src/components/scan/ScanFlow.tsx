@@ -93,7 +93,9 @@ export function ScanFlow() {
   // texture output for THIS photo (fetched at most once; re-applied locally on
   // every toggle). Cleared on re-analyze + reset.
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const finishCacheRef = useRef<{ image: string } | null>(null);
+  // { image } = cached texture to re-apply; { image: null } = gave up (don't
+  // re-call); null = not yet attempted for this photo.
+  const finishCacheRef = useRef<{ image: string | null } | null>(null);
 
   // The optional PROFILE (side-view) before/after — projection areas (chin / jaw
   // / nose) shown from the side, where their real effect reads. Only when a
@@ -200,9 +202,13 @@ export function ScanFlow() {
   // depends on the lips, so toggling cheeks/chin re-applies the cached texture
   // LOCALLY (no API). Fail-silent: any error/refusal/timeout keeps the warp.
   async function finishFront(warpResult: string, rid: number) {
-    const cached = finishCacheRef.current?.image;
-    if (cached) {
-      void applyFinish(warpResult, cached, rid); // no API — re-lock locally
+    // One attempt per photo, whatever the outcome: { image } caches a usable
+    // texture to re-apply locally; { image: null } latches "gave up" (fallback /
+    // refusal / error) so a persistent failure can't re-fire a paid call on every
+    // toggle. Either way, a non-null cache entry means "don't call Gemini again".
+    const cache = finishCacheRef.current;
+    if (cache) {
+      if (cache.image) void applyFinish(warpResult, cache.image, rid);
       return;
     }
     if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
@@ -224,11 +230,17 @@ export function ScanFlow() {
           signal: AbortSignal.timeout(65_000),
         });
         const data: { image?: string } = await res.json();
-        if (!data.image || rid !== recomposeId.current) return;
+        if (!data.image) {
+          finishCacheRef.current = { image: null }; // give up — don't retry
+          return;
+        }
         finishCacheRef.current = { image: data.image };
+        if (rid !== recomposeId.current) return;
         await applyFinish(warpResult, data.image, rid);
       } catch {
-        // fail-silent — the warp result is already on screen
+        // Transient (timeout/network) — latch give-up to bound paid calls; the
+        // warp result is already on screen. A re-analyze clears it for a retry.
+        finishCacheRef.current = { image: null };
       }
     }, 450);
   }
