@@ -89,6 +89,13 @@ export function ScanFlow() {
   // Bumped on every recompose so a slow paste+warp from an old toggle can't land
   // after a newer one (recompose is async now — the warp loads an image).
   const recomposeId = useRef(0);
+  // The background texture-finish: a debounce timer + the cached generative
+  // texture output for THIS photo (fetched at most once; re-applied locally on
+  // every toggle). Cleared on re-analyze + reset.
+  const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // { image } = cached texture to re-apply; { image: null } = gave up (don't
+  // re-call); null = not yet attempted for this photo.
+  const finishCacheRef = useRef<{ image: string | null } | null>(null);
 
   // The optional PROFILE (side-view) before/after — projection areas (chin / jaw
   // / nose) shown from the side, where their real effect reads. Only when a
@@ -176,6 +183,98 @@ export function ScanFlow() {
     }
     if (rid !== recomposeId.current) return; // a newer toggle superseded us
     setCombinedSrc(base);
+
+    // Progressive enhancement: the warp shape is shown instantly above; now add
+    // the photoreal filler TEXTURE (sheen/highlight) the warp can't synthesize,
+    // as a background pass that swaps in when ready. Lips only — the everted lip
+    // is where flat geometry reads least real; chin/jaw projection is structural
+    // (no filler sheen) and cheeks already go through the generative model.
+    // Only on a relaxed CLOSED mouth: with the mouth open the texture pass tends
+    // to nudge the smile and the identity-lock harness rejects it — so attempting
+    // it would just burn a paid call to fail-silent. (We already nudge patients
+    // to a closed mouth at capture.)
+    if (lipsOn && !isMouthOpen(src.lm)) void finishFront(base, rid);
+  }
+
+  // Background "+finish": add the photoreal lip texture the warp can't, and swap
+  // it in. The expensive part — the generative texture — is fetched at most ONCE
+  // per photo and cached: the lip warp is deterministic and the texture only
+  // depends on the lips, so toggling cheeks/chin re-applies the cached texture
+  // LOCALLY (no API). Fail-silent: any error/refusal/timeout keeps the warp.
+  async function finishFront(warpResult: string, rid: number) {
+    // One attempt per photo, whatever the outcome: { image } caches a usable
+    // texture to re-apply locally; { image: null } latches "gave up" (fallback /
+    // refusal / error) so a persistent failure can't re-fire a paid call on every
+    // toggle. Either way, a non-null cache entry means "don't call Gemini again".
+    const cache = finishCacheRef.current;
+    if (cache) {
+      if (cache.image) void applyFinish(warpResult, cache.image, rid);
+      return;
+    }
+    if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
+    finishTimerRef.current = setTimeout(async () => {
+      if (rid !== recomposeId.current) return; // superseded while debouncing
+      try {
+        const res = await fetch("/api/simulate", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            image: warpResult,
+            finishAreas: ["lips"],
+            // So the texture pass keeps the exact mouth/teeth — else the harness
+            // rejects it (the warp preserves the original mouth state).
+            mouthOpen: frontWarpRef.current
+              ? isMouthOpen(frontWarpRef.current.lm)
+              : undefined,
+          }),
+          signal: AbortSignal.timeout(65_000),
+        });
+        const data: { image?: string } = await res.json();
+        if (!data.image) {
+          finishCacheRef.current = { image: null }; // give up — don't retry
+          return;
+        }
+        finishCacheRef.current = { image: data.image };
+        if (rid !== recomposeId.current) return;
+        await applyFinish(warpResult, data.image, rid);
+      } catch {
+        // Transient (timeout/network) — latch give-up to bound paid calls; the
+        // warp result is already on screen. A re-analyze clears it for a retry.
+        finishCacheRef.current = { image: null };
+      }
+    }, 450);
+  }
+
+  // Identity-lock a (cached or fresh) texture output onto the current warp base:
+  // paste ONLY its lip region over the warp, so it adds sheen but cannot move the
+  // shape we already set. The mouth-drift harness rejects expression drift — on a
+  // relaxed closed mouth the texture lands; otherwise we keep the warp.
+  async function applyFinish(warpResult: string, aiImage: string, rid: number) {
+    const src = frontWarpRef.current;
+    if (!src) return;
+    try {
+      const wimg = await loadImage(warpResult);
+      const det = await detectFace(wimg, src.width, src.height);
+      if (det.status !== "ok" || !det.landmarks) return;
+      const prep = await prepareComposite(
+        warpResult,
+        det.landmarks,
+        ["lips"],
+        aiImage,
+        src.width,
+        src.height,
+      );
+      if (!prep.ok || !prep.prep) {
+        // Expected on an open/smiling mouth — keep the warp, note for QA only.
+        console.debug(`[finish] kept warp: ${prep.reason}`);
+        return;
+      }
+      const locked = pasteComposite(prep.prep, ["lips"]);
+      if (!locked || rid !== recomposeId.current) return;
+      setCombinedSrc(locked);
+    } catch {
+      // fail-silent — the warp result is already on screen
+    }
   }
 
   // Generate the combined "after" once, retrying if the harness rejects it
@@ -373,6 +472,9 @@ export function ScanFlow() {
       // Start with every recommended area selected (the full plan).
       applySelection(new Set(assessment.areas.map((a) => a.area)));
       frontPrepRef.current = null;
+      // New photo → the prior photo's cached lip texture no longer applies.
+      if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
+      finishCacheRef.current = null;
       setCombinedSrc(null);
       setStep("result");
 
@@ -432,6 +534,8 @@ export function ScanFlow() {
     setCombinedLoading(false);
     frontPrepRef.current = null;
     frontWarpRef.current = null;
+    if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
+    finishCacheRef.current = null;
     setProfile(null);
     setProfileSrc(null);
     setProfileLoading(false);

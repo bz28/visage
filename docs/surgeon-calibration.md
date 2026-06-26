@@ -98,11 +98,16 @@ fraction of **lip height** (`src/lib/warp.ts`, `LIP_MAG`). We need your read:
   (the whole lip forward — only visible in profile)?
 - **Open vs closed mouth:** we gate patients to a relaxed closed mouth; confirm a
   closed mouth is what you'd assess lip filler on.
+- **Texture / sheen:** on top of the shape, we add a subtle photoreal "filler
+  sheen" (the soft highlight real filler gives). How glossy is *too* glossy —
+  i.e. where does the texture cross from "natural fuller lip" into "obviously
+  done / wet-look"? (so we cap the finish strength)
 
-*Note for us (not the surgeon): the lip magnitude was validated to look natural
-on an open-mouth test face; re-check on a gated closed-mouth photo once we have
-one, and consider a light generative texture finish on the warped lips (needs a
-live image-gen key to evaluate) — see docs/simulation-architecture.md.*
+*Note for us (not the surgeon): the lip magnitude + texture finish were validated
+to look natural on an open-mouth test face; the warp→finish→identity-lock
+pipeline works, and the finish fails-silent to the warp on any drift. Open gap:
+no closed-mouth fixture yet, so the closed-mouth finish swap-in isn't covered by
+the automated e2e — add one. See docs/simulation-architecture.md.*
 
 *Fix what's wrong, ignore what's fine. Code pointers live next to each value if
 you want them.*

@@ -141,6 +141,38 @@ export function buildCombinedPrompt(
   );
 }
 
+// Human names for the finish prompt (which talks about the area, not an edit).
+const FINISH_LABEL: Partial<Record<SimulatableArea, string>> = {
+  lips: "lips",
+  cheeks: "cheeks",
+};
+
+/**
+ * The "+finish" pass. The geometric warp has already reshaped the area (fuller
+ * lips / projected cheeks) — its shape is the patient's own pixels, moved. This
+ * asks the model to add ONLY the photoreal *texture* the warp can't synthesize
+ * (the soft sheen + volume highlight of real filler) without touching the shape,
+ * so the result reads like a real result, not a stretch. The composite then
+ * re-locks everything outside the area, so even the texture pass can't drift it.
+ */
+export function buildFinishPrompt(
+  areas: SimulatableArea[],
+  mouthOpen?: boolean,
+): string {
+  const names = areas.map((a) => FINISH_LABEL[a] ?? a).join(" and the ");
+  return (
+    `This photo is a dermal-filler PREVIEW: the ${names} have already been made ` +
+    `fuller by reshaping. Add ONLY subtle, photorealistic filler texture to the ` +
+    `${names} — the soft sheen and gentle volume highlight that real filler gives ` +
+    `— so they look natural, not stretched. Do NOT change their shape, outline, ` +
+    `size, or position in any way, and change NOTHING else in the photo. ` +
+    // The texture pass must not nudge the mouth/teeth — the identity-lock harness
+    // rejects any expression drift, which would silently drop the finish.
+    mouthRule(areas.includes("lips"), mouthOpen) +
+    PRESERVE_RULE
+  );
+}
+
 /**
  * Per-area, per-look instruction for the CLINICIAN tool (not used in the patient
  * flow — the patient gets `buildCombinedPrompt`). Kept for the injector dialing

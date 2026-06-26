@@ -8,6 +8,7 @@ import {
   DEFAULT_LOOK,
   buildPrompt,
   buildCombinedPrompt,
+  buildFinishPrompt,
 } from "@/lib/simulation";
 
 export const runtime = "nodejs";
@@ -19,6 +20,9 @@ const bodySchema = z.object({
   // Patient flow: all recommended areas in one combined edit (front photo).
   // (The profile before/after is an on-device geometric warp now — no API.)
   areas: z.array(z.enum(SIMULATABLE)).min(1).max(6).optional(),
+  // "+finish" pass: the image is already geometrically warped (fuller lips /
+  // cheeks); add ONLY the photoreal texture the warp can't, leaving the shape.
+  finishAreas: z.array(z.enum(SIMULATABLE)).min(1).max(3).optional(),
   // Clinician flow: a single area at a chosen look.
   area: z.enum(SIMULATABLE).optional(),
   look: z.enum(LOOK_KEYS).optional(),
@@ -41,9 +45,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  // Combined front (areas) · single-area (clinician tool, not yet wired up).
+  // Finish pass (finishAreas) · combined front (areas) · single-area (clinician).
   let prompt: string;
-  if (body.areas?.length) {
+  if (body.finishAreas?.length) {
+    prompt = buildFinishPrompt(body.finishAreas, body.mouthOpen);
+  } else if (body.areas?.length) {
     prompt = buildCombinedPrompt(body.areas, body.mouthOpen);
   } else if (body.area) {
     prompt = buildPrompt(body.area, body.look ?? DEFAULT_LOOK, body.mouthOpen);
