@@ -36,6 +36,35 @@ exact amount, it can't change identity (it's the patient's pixels), and angles
 agree. **Generative** = stochastic; it samples, so it can't guarantee any of
 those. For a medical preview, the deterministic backbone is non-negotiable.
 
+## Why not a full 3D render? (the obvious-but-wrong end goal)
+
+A tempting "most accurate" target is: reconstruct a full 3D model of the face,
+apply the filler as 3D volume, and **re-render** it back to a 2D image. We
+deliberately do **not** do this, because the re-render is exactly where it
+fails for *our* product (a photoreal single-photo preview that must look like
+**this person**):
+
+1. **It throws away the real photo.** A re-render maps texture + lighting onto a
+   mesh and lands in the uncanny/CGI valley — it looks like an avatar, not a
+   photo of the patient. Our warp keeps the patient's actual pixels and only
+   *moves* them, so the output is photoreal by construction. For a trust-driven
+   medical preview, re-rendering is a regression on the metric that matters most.
+2. **Single-photo 3D is itself an estimate.** You can't truly recover depth from
+   one selfie, so a "3D-accurate" render is built on an approximated model — you
+   inherit that error *and* lose photorealism. Tools that do real 3D (Crisalix
+   et al.) require multi-photo or a depth scan and target *surgical planning*
+   (rotate a model), a different modality from "here's a believable you."
+3. **Huge build, worse output.** It's a major ML/graphics effort for a result
+   that's likely *less* believable than what we ship today.
+
+What we do instead captures the one real 3D benefit — correct projection
+*direction* at any head angle — by being **3D-mesh-informed** (the warp is
+driven by MediaPipe's 478-point mesh with z-depth) **without** the re-render.
+Full 3D only becomes the goal if the product pivots to an **interactive,
+rotatable 3D viewer** with **multi-photo / scan input** — a different product,
+not a blocker here. *(Open refinement: we capture per-landmark z but don't yet
+use it for true surface-normal warp direction — see the warp.ts header.)*
+
 ## The three jobs AI does here
 
 AI isn't one thing. Three distinct kinds, in three roles:
