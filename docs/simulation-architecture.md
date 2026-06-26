@@ -97,11 +97,24 @@ wedge.
 
 - **Built today:** the deterministic warp engine drives **all reshape
   treatments** — lips (eversion), chin/jaw/nose (projection) — on **both** the
-  profile and the front, identity-locked and at **zero** image-gen cost. The
-  generative model is now scoped to **flat-area volume only** (cheeks, folds).
-  Plus the vision-LLM read; on-device measurements + landmarks; identity-lock
-  composite for the generative areas. A lips-only patient (the wedge) makes **no
-  image-gen call at all**.
-- **Next:** a light generative *texture finish* on the warped lips/cheeks (needs
-  a live image-gen key to evaluate); calibration of every warp magnitude to the
-  surgeon's real before/after photos (`docs/surgeon-calibration.md`).
+  profile and the front, identity-locked. The generative model is scoped to
+  **flat-area volume** (cheeks, folds) plus a **texture finish**. The vision-LLM
+  read; on-device measurements + landmarks; identity-lock composite.
+- **Texture finish (built + wired):** after the lip warp shows instantly, a
+  background generative pass adds the photoreal sheen/highlight the geometry
+  can't synthesize, then is **identity-locked to the lip region** of the warp so
+  it can add texture but never move the shape. It's a **progressive enhancement**:
+  the warp is the floor (always shown), the finish swaps in when ready, and any
+  drift/refusal/timeout **fails silently to the warp**. It only fires on a relaxed
+  **closed mouth** (the gated norm) — on an open/smiling mouth the model tends to
+  nudge the smile and the harness rejects it, so attempting it would just burn a
+  call. Debounced + cached (one call per settled view).
+  - *Validated:* the route+prompt produce texture with a real key; the
+    warp→finish→identity-lock pipeline produces a clean locked result; the wired
+    trigger + fail-silent + closed-mouth gate all verified in the live flow.
+  - *Known gap (needs a closed-mouth fixture):* the e2e fixture is open-mouthed,
+    so the closed-mouth *swap-in* isn't covered by the automated e2e yet — add a
+    closed-mouth fixture to assert it. Tracked here, not silently skipped.
+- **Next:** calibration of every warp magnitude **and** the finish texture
+  strength to the surgeon's real before/after photos (`docs/surgeon-calibration.md`);
+  a closed-mouth e2e fixture; optionally a cross-fade on the finish swap.
