@@ -4,6 +4,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
 import {
   SIMULATABLE,
+  FINISH_AREAS,
   LOOK_KEYS,
   DEFAULT_LOOK,
   buildPrompt,
@@ -22,7 +23,9 @@ const bodySchema = z.object({
   areas: z.array(z.enum(SIMULATABLE)).min(1).max(6).optional(),
   // "+finish" pass: the image is already geometrically warped (fuller lips /
   // cheeks); add ONLY the photoreal texture the warp can't, leaving the shape.
-  finishAreas: z.array(z.enum(SIMULATABLE)).min(1).max(3).optional(),
+  // Restricted to the finish-eligible areas so an unsupported area is rejected
+  // at the boundary (and buildFinishPrompt can label every value it receives).
+  finishAreas: z.array(z.enum(FINISH_AREAS)).min(1).max(2).optional(),
   // Clinician flow: a single area at a chosen look.
   area: z.enum(SIMULATABLE).optional(),
   look: z.enum(LOOK_KEYS).optional(),
@@ -36,6 +39,9 @@ const bodySchema = z.object({
 const MODEL = "gemini-2.5-flash-image";
 const API_KEY =
   process.env.GEMINI_API_KEY ?? process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+// Built once at module load (the handler short-circuits when API_KEY is unset),
+// rather than reconstructing the client on every request.
+const google = createGoogleGenerativeAI({ apiKey: API_KEY ?? "" });
 
 export async function POST(req: Request) {
   let body;
@@ -72,7 +78,6 @@ export async function POST(req: Request) {
   }
 
   try {
-    const google = createGoogleGenerativeAI({ apiKey: API_KEY });
     const result = await generateText({
       model: google(MODEL),
       providerOptions: { google: { responseModalities: ["IMAGE"] } },
