@@ -51,13 +51,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  // Dev mock (no key): echo the original photo so the UI flow is fully testable
-  // without paying for / configuring image-gen. Never in production.
-  if (
-    !API_KEY &&
-    process.env.MOCK_SIMULATE &&
-    process.env.NODE_ENV !== "production"
-  ) {
+  // Dev/test mock: echo the source photo so the UI flow (and the e2e) is fully
+  // testable without paying for image-gen. An explicit MOCK_SIMULATE forces this
+  // even when a key IS configured — matches MOCK_ANALYZE — so tests never make
+  // real paid calls just because .env.local has a key. Never in production.
+  if (process.env.MOCK_SIMULATE && process.env.NODE_ENV !== "production") {
     await new Promise((r) => setTimeout(r, 900));
     return NextResponse.json({ image: body.image, mock: true });
   }
