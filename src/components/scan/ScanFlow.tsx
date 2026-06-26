@@ -20,7 +20,7 @@ import {
 } from "@/lib/simulation";
 import { warpAreas, warpLips } from "@/lib/warp";
 import { loadImage } from "@/lib/image";
-import type { Assessment } from "@/lib/assessment-schema";
+import { AREA_LABELS, type Assessment } from "@/lib/assessment-schema";
 import type { Intake as IntakeData } from "@/lib/intake-schema";
 import type { ViewKey } from "@/lib/views";
 import { Intake } from "./Intake";
@@ -720,6 +720,32 @@ export function ScanFlow() {
                                   : undefined
                             }
                           />
+                          {/* When the generative pass fails but the lip/chin/jaw
+                              warp still rendered, the preview shows SOME selected
+                              areas and silently omits the generative ones (cheeks/
+                              folds). Say so — never present a partial after as the
+                              whole plan. */}
+                          {combinedFailed &&
+                            combinedSrc &&
+                            (() => {
+                              const missing = [...selected].filter(
+                                (a) =>
+                                  isSimulatable(a) &&
+                                  !isFrontWarpArea(a) &&
+                                  a !== "lips",
+                              );
+                              if (missing.length === 0) return null;
+                              const names = missing
+                                .map((a) => AREA_LABELS[a] ?? a)
+                                .join(" and ");
+                              return (
+                                <p className="text-xs text-ink-400">
+                                  Your {names} preview couldn&apos;t be generated
+                                  this time — {missing.length > 1 ? "they're" : "it's"}{" "}
+                                  still part of your read to discuss with a provider.
+                                </p>
+                              );
+                            })()}
                         </div>
                       )}
 
