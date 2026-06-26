@@ -80,5 +80,29 @@ We need real numbers from you:
 - Per-area **direction** — we push forward along the face's sagittal axis; is
   that right, or should chin drop / jaw flare more?
 
+## Lips — how *much* fuller (the lip warp)
+
+Lips (our v1 wedge) are now also a geometric **warp**, not AI: we evert the
+vermillion border outward from the mouth centre (taller, fuller lips) while
+**anchoring the mouth corners** so the mouth can't widen. The patient's own lips,
+made fuller — identity-locked, no AI, no shape/mouth drift. The amount is a
+fraction of **lip height** (`src/lib/warp.ts`, `LIP_MAG`). We need your read:
+
+- A *natural* ≈1-syringe lip result is what % taller, roughly? (placeholder ~22%
+  of lip height; we showed it looks natural but want your number)
+- Where does it start to look **overfilled / "duck"**? (so we cap the slider in
+  the clinician tool)
+- Should the **upper:lower** split be even, or more lower-lip? (we currently push
+  both borders out symmetrically)
+- Is **eversion** (border rolls out) the right model, or is it more **projection**
+  (the whole lip forward — only visible in profile)?
+- **Open vs closed mouth:** we gate patients to a relaxed closed mouth; confirm a
+  closed mouth is what you'd assess lip filler on.
+
+*Note for us (not the surgeon): the lip magnitude was validated to look natural
+on an open-mouth test face; re-check on a gated closed-mouth photo once we have
+one, and consider a light generative texture finish on the warped lips (needs a
+live image-gen key to evaluate) — see docs/simulation-architecture.md.*
+
 *Fix what's wrong, ignore what's fine. Code pointers live next to each value if
 you want them.*

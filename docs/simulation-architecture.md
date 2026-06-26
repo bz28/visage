@@ -55,7 +55,7 @@ AI isn't one thing. Three distinct kinds, in three roles:
 | Treatment | Tool | Why |
 |---|---|---|
 | Chin / jaw / nose (projection) | **Warp** | Pure shape — real pixels, calibratable, multi-angle. |
-| Lips (fullness) | **Generative** | New sheen/shadow must be painted. |
+| Lips (fullness) | **Warp** (+ generative finish later) | Everting the vermillion border is a shape change — identity-locked, no shape/mouth drift. A light generative sheen finish is a future enhancement (needs a live image-gen key to evaluate). |
 | Cheeks (volume) | **Warp + generative finish** | Shape is a warp; the new highlight needs rendering. |
 | Under-eye / tear trough | **Generative** | Filling a *shadow* is a lighting change, not a shape change. |
 | Botox / tox (softening lines) | **Generative** | A texture/appearance change. |
@@ -95,11 +95,13 @@ wedge.
 
 ## Status (snapshot — trust the code over this section)
 
-- **Built today:** front before/after via generative (Gemini) + identity-lock
-  composite; the vision-LLM read; on-device measurements + landmarks.
-- **In progress (Phase 1):** the deterministic warp engine, used first for the
-  **profile** (chin/jaw/nose), replacing the generative-paste that breaks at an
-  angle. Drops profile/projection from paid image-gen calls to **zero**.
-- **Next:** extend the warp to front projection; keep generative for lips/skin;
-  the optional geometry-first/AI-finish pass; calibration to the surgeon's real
-  before/after photos.
+- **Built today:** the deterministic warp engine drives **all reshape
+  treatments** — lips (eversion), chin/jaw/nose (projection) — on **both** the
+  profile and the front, identity-locked and at **zero** image-gen cost. The
+  generative model is now scoped to **flat-area volume only** (cheeks, folds).
+  Plus the vision-LLM read; on-device measurements + landmarks; identity-lock
+  composite for the generative areas. A lips-only patient (the wedge) makes **no
+  image-gen call at all**.
+- **Next:** a light generative *texture finish* on the warped lips/cheeks (needs
+  a live image-gen key to evaluate); calibration of every warp magnitude to the
+  surgeon's real before/after photos (`docs/surgeon-calibration.md`).

@@ -235,6 +235,49 @@ async function main() {
       `warp identity-lock verified (eye Δ${lock.eye.toFixed(2)} < projection Δ${lock.projection.toFixed(2)}) ✓`,
     );
 
+    // The FRONT lip warp ran: the lip region changed vs the original, while the
+    // upper face stayed locked (the wedge treatment, rendered geometrically).
+    const lips = await page.evaluate(() => {
+      const before = [...document.querySelectorAll('img[alt=""]')].filter(
+        (i) => i.naturalWidth > 50,
+      )[0];
+      const after = document.querySelector('img[alt*="Simulated preview"]'); // [0] = front
+      if (!before || !after) return { ok: false };
+      const W = 160,
+        H = 200;
+      const data = (im) => {
+        const c = document.createElement("canvas");
+        c.width = W;
+        c.height = H;
+        const x = c.getContext("2d");
+        x.drawImage(im, 0, 0, W, H);
+        return x.getImageData(0, 0, W, H).data;
+      };
+      const A = data(before),
+        B = data(after);
+      const diff = (y0, y1) => {
+        let s = 0,
+          n = 0;
+        for (let y = Math.floor(y0 * H); y < Math.floor(y1 * H); y++)
+          for (let xp = 0; xp < W; xp++) {
+            const i = (y * W + xp) * 4;
+            s += Math.abs(A[i] - B[i]);
+            n++;
+          }
+        return s / n;
+      };
+      return { ok: true, eye: diff(0.2, 0.42), lip: diff(0.58, 0.74) };
+    });
+    if (!lips.ok) fail("lip-warp check: front pair not found");
+    if (lips.lip <= lips.eye) {
+      fail(
+        `lip warp not behaving: lip Δ${lips.lip.toFixed(2)} ≤ locked-eye Δ${lips.eye.toFixed(2)}`,
+      );
+    }
+    log(
+      `front lip warp verified (eye Δ${lips.eye.toFixed(2)} < lip Δ${lips.lip.toFixed(2)}) ✓`,
+    );
+
     // Toggle every area OFF → the "after" preview must clear. Guards the
     // empty-selection path where an in-flight (async) chin/jaw warp could
     // otherwise resume and clobber the blank the patient just asked for.
