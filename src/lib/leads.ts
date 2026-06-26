@@ -3,10 +3,15 @@ import { z } from "zod";
 import { neon } from "@neondatabase/serverless";
 import { Resend } from "resend";
 import { CLINIC } from "./clinic";
+import { isValidContact } from "./contact";
 
 export const leadSchema = z.object({
   name: z.string().min(1).max(120),
-  contact: z.string().min(3).max(200), // email or phone
+  // Must be a reachable email or phone — a garbage contact is a dead lead.
+  contact: z
+    .string()
+    .max(200)
+    .refine(isValidContact, "Enter a valid email or phone number"),
   /** Area keys the patient was interested in. */
   interests: z.array(z.string()).max(10).default([]),
   note: z.string().max(1000).optional(),
