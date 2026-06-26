@@ -175,10 +175,17 @@ export function ScanFlow() {
       return;
     }
 
+    // Lips are only warped on a relaxed CLOSED mouth. Everting the lip border on
+    // an open/parted mouth pushes the lower lip down into the teeth and distorts
+    // it — and lip filler is assessed on a closed mouth anyway (we nudge for one
+    // at capture). On an open mouth we skip the lip preview rather than show a
+    // distortion; chin/jaw + cheeks/folds still apply.
+    const lipsWarpable = lipsOn && !isMouthOpen(src.lm);
+
     // Apply the geometric warps in sequence: fuller lips, then chin/jaw
     // projection. Each pastes only its own region back onto the original, so the
     // rest stays exact. (loadImage decodes the prior step's result.)
-    if (lipsOn) {
+    if (lipsWarpable) {
       const img = await loadImage(base);
       const w = warpLips(img, src.lm, src.width, src.height);
       if (w) base = w;
@@ -196,11 +203,9 @@ export function ScanFlow() {
     // as a background pass that swaps in when ready. Lips only — the everted lip
     // is where flat geometry reads least real; chin/jaw projection is structural
     // (no filler sheen) and cheeks already go through the generative model.
-    // Only on a relaxed CLOSED mouth: with the mouth open the texture pass tends
-    // to nudge the smile and the identity-lock harness rejects it — so attempting
-    // it would just burn a paid call to fail-silent. (We already nudge patients
-    // to a closed mouth at capture.)
-    if (lipsOn && !isMouthOpen(src.lm)) void finishFront(base, rid);
+    // Same closed-mouth gate as the warp: on an open mouth there's no lip warp to
+    // finish, and the texture pass would nudge the smile (harness rejects it).
+    if (lipsWarpable) void finishFront(base, rid);
   }
 
   // Background "+finish": add the photoreal lip texture the warp can't, and swap
@@ -751,6 +756,18 @@ export function ScanFlow() {
                                 </p>
                               );
                             })()}
+                          {/* Lips were recommended but the mouth is open — we skip
+                              the lip warp (everting a parted mouth distorts it), so
+                              tell the patient how to get the lip preview. */}
+                          {selected.has("lips") &&
+                            frontWarpRef.current &&
+                            isMouthOpen(frontWarpRef.current.lm) && (
+                              <p className="text-xs text-ink-400">
+                                For a lip preview, retake with a relaxed, closed
+                                mouth — lips read truest that way. Your read still
+                                includes them.
+                              </p>
+                            )}
                         </div>
                       )}
 

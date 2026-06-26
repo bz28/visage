@@ -245,52 +245,24 @@ async function main() {
       `warp identity-lock verified (eye Δ${lock.eye.toFixed(2)} < projection Δ${lock.projection.toFixed(2)}) ✓`,
     );
 
-    // The FRONT lip warp ran: the lip region changed vs the original, while the
-    // upper face stayed locked (the wedge treatment, rendered geometrically).
-    const lips = await page.evaluate(() => {
-      const before = [...document.querySelectorAll('img[alt=""]')].filter(
-        (i) => i.naturalWidth > 50,
-      )[0];
-      const after = document.querySelector('img[alt*="Simulated preview"]'); // [0] = front
-      if (!before || !after) return { ok: false };
-      const W = 160,
-        H = 200;
-      const data = (im) => {
-        const c = document.createElement("canvas");
-        c.width = W;
-        c.height = H;
-        const x = c.getContext("2d");
-        x.drawImage(im, 0, 0, W, H);
-        return x.getImageData(0, 0, W, H).data;
-      };
-      const A = data(before),
-        B = data(after);
-      const diff = (y0, y1) => {
-        let s = 0,
-          n = 0;
-        for (let y = Math.floor(y0 * H); y < Math.floor(y1 * H); y++)
-          for (let xp = 0; xp < W; xp++) {
-            const i = (y * W + xp) * 4;
-            s += Math.abs(A[i] - B[i]);
-            n++;
-          }
-        return s / n;
-      };
-      return { ok: true, eye: diff(0.2, 0.42), lip: diff(0.58, 0.74) };
-    });
-    if (!lips.ok) fail("lip-warp check: front pair not found");
-    if (lips.lip <= lips.eye) {
+    // Lip-warp GATE on an open mouth. This fixture is open-mouthed, so the lip
+    // warp must be SKIPPED — everting a parted lip distorts it (pushes the lower
+    // lip into the teeth). We assert the patient-facing "retake closed-mouth"
+    // note is shown, which fires iff the gate engaged (lips selected + mouth open
+    // → no lip warp). Guards the open-mouth lip distortion regression.
+    const lipGateNote = await page
+      .getByText(/retake with a relaxed, closed mouth/i)
+      .count();
+    if (lipGateNote === 0) {
       fail(
-        `lip warp not behaving: lip Δ${lips.lip.toFixed(2)} ≤ locked-eye Δ${lips.eye.toFixed(2)}`,
+        "lip-warp gate broken: open mouth should skip the lip warp and show the closed-mouth note",
       );
     }
-    log(
-      `front lip warp verified (eye Δ${lips.eye.toFixed(2)} < lip Δ${lips.lip.toFixed(2)}) ✓`,
-    );
+    log("lip warp correctly gated on open mouth (note shown) ✓");
 
-    // Closed-mouth GATE: this fixture is open-mouthed, so the texture finish must
-    // NOT have fired (it would burn a paid call to fail the identity-lock harness).
-    // Give any debounced finish a beat to (not) fire, then assert zero calls.
+    // Closed-mouth GATE: open mouth ⇒ the texture finish must NOT fire either (it
+    // would burn a paid call to fail the identity-lock harness). Give any
+    // debounced finish a beat to (not) fire, then assert zero calls.
     await page.waitForTimeout(800);
     if (finishCalls !== 0) {
       fail(`finish gate broken: ${finishCalls} finish call(s) on an open mouth`);
