@@ -46,8 +46,11 @@ const norm = (a: Pt): Pt => {
  * docs/surgeon-calibration.md (warp section).
  */
 const AREA_WARP: Record<ProfileArea, { movers: number[]; mag: number }> = {
-  // Chin pad: the front-bottom jaw contour + the chin tip, pushed forward.
-  chin: { movers: [148, 176, 149, 150, 152, 377, 400, 378, 379, 17], mag: 0.05 },
+  // Chin pad: the symmetric front-bottom chin/jaw contour + the chin tip
+  // (KEY.menton = 152), pushed forward. Deliberately NO lip points — a chin
+  // treatment must not drag the lower lip (index 17 = KEY.lowerLipBottom was
+  // removed: it broke the L/R symmetry and pulled the lip forward with the chin).
+  chin: { movers: [148, 176, 149, 150, KEY.menton, 377, 400, 378, 379], mag: 0.05 },
   // Jaw angle + sides, pushed out to define the angle.
   jawline: { movers: [KEY.gonionR, KEY.gonionL, 136, 150, 365, 379, 172, 397], mag: 0.038 },
   // Dorsum + tip — most sensitive area, keep it the gentlest.
@@ -123,8 +126,8 @@ function regionMask(
   scale: number,
   width: number,
   height: number,
-  rFactor = 0.13,
-  bFactor = 0.06,
+  rFactor: number,
+  bFactor: number,
 ): HTMLCanvasElement {
   const mask = document.createElement("canvas");
   mask.width = width;
@@ -193,6 +196,10 @@ export function warpAreas(
   height: number,
 ): string | null {
   if (areas.length === 0) return null;
+  // Fail closed if the landmarks buildControls dereferences are missing (sparse
+  // detection) — return null so the caller keeps the untouched original, rather
+  // than throwing. Mirrors warpLips's guard.
+  if (!lm[KEY.glabella] || !lm[KEY.menton] || !lm[KEY.noseTip]) return null;
   const { controls, movers, scale } = buildControls(lm, areas);
   return renderWarp(img, controls, movers, scale, width, height);
 }
@@ -314,11 +321,12 @@ function renderWarp(
   // Identity lock: keep the warp only over the moved region, paste it onto the
   // ORIGINAL photo. Everything outside the feathered mask is the patient's exact
   // original pixels — no global resample of eyes/hair/background.
+  // Keep only warped ∩ mask, reusing the already-validated wctx (getContext on
+  // the same canvas returns the same context).
   const mask = regionMask(movers, scale, width, height, maskR, maskB);
-  const masked = warped.getContext("2d")!; // reuse: keep warped ∩ mask
-  masked.globalCompositeOperation = "destination-in";
-  masked.drawImage(mask, 0, 0);
-  masked.globalCompositeOperation = "source-over";
+  wctx.globalCompositeOperation = "destination-in";
+  wctx.drawImage(mask, 0, 0);
+  wctx.globalCompositeOperation = "source-over";
 
   const out = document.createElement("canvas");
   out.width = width;
