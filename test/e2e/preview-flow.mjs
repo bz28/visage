@@ -17,6 +17,7 @@ import { chromium } from "playwright-core";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..", "..");
 const FIXTURE = join(__dirname, "..", "fixtures", "test-face.jpg");
+const FIXTURE_CLOSED = join(__dirname, "..", "fixtures", "test-face-closed.jpg");
 const NO_FACE = join(__dirname, "..", "fixtures", "no-face.jpg");
 const PORT = process.env.E2E_PORT || "3100";
 const BASE = `http://localhost:${PORT}`;
@@ -287,6 +288,104 @@ async function main() {
       { timeout: 15_000 },
     );
     log("all-off clears the preview ✓");
+
+    // ── Second flow: CLOSED-mouth fixture — the wedge happy path. Here the lip
+    // warp SHOULD fire (fuller lips), so we assert the lip region changes far
+    // more than the locked upper face. Covers the positive lip-warp the
+    // open-mouth flow above intentionally gates off.
+    log("closed-mouth flow: verifying the lip warp fires…");
+    await page.goto(BASE, { waitUntil: "networkidle", timeout: 90_000 });
+    const cont2 = page.getByRole("button", { name: /Continue/i }).first();
+    await cont2.waitFor({ state: "visible", timeout: 60_000 });
+    const fileInput2 = page.locator('input[type="file"]');
+    for (let i = 0; i < 5; i++) {
+      await cont2.click().catch(() => {});
+      try {
+        await fileInput2.waitFor({ state: "attached", timeout: 4_000 });
+        break;
+      } catch {
+        if (i === 4) throw new Error("intake never advanced (closed flow)");
+      }
+    }
+    await fileInput2.setInputFiles(FIXTURE_CLOSED);
+    // Closed mouth → the framing nudge may or may not appear; accept it if shown.
+    const useAnyway3 = page.getByRole("button", { name: /Use anyway/i });
+    const seeRead2 = page.getByRole("button", { name: /See my read/i });
+    await Promise.race([
+      useAnyway3.waitFor({ timeout: 30_000 }).catch(() => {}),
+      seeRead2.waitFor({ timeout: 30_000 }).catch(() => {}),
+    ]);
+    if (await useAnyway3.isVisible().catch(() => false)) await useAnyway3.click();
+    await seeRead2.click();
+    await page
+      .getByRole("heading", { name: /explore together/i })
+      .waitFor({ timeout: 60_000 });
+    await page.waitForFunction(
+      () => {
+        const img = document.querySelector('img[alt*="Simulated preview"]');
+        return !!img && img.complete && img.naturalWidth > 0;
+      },
+      { timeout: 60_000 },
+    );
+    // Isolate the lip warp by toggling LIPS off and comparing the two "after"
+    // images: only the lip warp differs between them. Its lip region must change
+    // a lot while the eye region stays put — this can't pass off the chin/jaw
+    // warp (that's identical in both), unlike a before/after region diff.
+    const afterOn = await page.evaluate(
+      () => document.querySelector('img[alt*="Simulated preview"]')?.src,
+    );
+    await page.getByRole("switch", { name: /lips in preview/i }).click();
+    await page.waitForFunction(
+      (prev) => {
+        const img = document.querySelector('img[alt*="Simulated preview"]');
+        return !!img && img.complete && img.naturalWidth > 0 && img.src !== prev;
+      },
+      afterOn,
+      { timeout: 30_000 },
+    );
+    const lipWarp = await page.evaluate((onSrc) => {
+      const off = document.querySelector('img[alt*="Simulated preview"]');
+      if (!off || !onSrc) return Promise.resolve({ ok: false });
+      const W = 160,
+        H = 200;
+      const draw = (src) =>
+        new Promise((res) => {
+          const im = new Image();
+          im.onload = () => {
+            const c = document.createElement("canvas");
+            c.width = W;
+            c.height = H;
+            const x = c.getContext("2d");
+            x.drawImage(im, 0, 0, W, H);
+            res(x.getImageData(0, 0, W, H).data);
+          };
+          im.src = src;
+        });
+      return Promise.all([draw(onSrc), draw(off.src)]).then(([A, B]) => {
+        const diff = (y0, y1) => {
+          let s = 0,
+            n = 0;
+          for (let y = Math.floor(y0 * H); y < Math.floor(y1 * H); y++)
+            for (let xp = 0; xp < W; xp++) {
+              const i = (y * W + xp) * 4;
+              s += Math.abs(A[i] - B[i]);
+              n++;
+            }
+          return s / n;
+        };
+        return { ok: true, eye: diff(0.2, 0.42), lip: diff(0.58, 0.74) };
+      });
+    }, afterOn);
+    if (!lipWarp.ok) fail("closed-mouth lip warp: preview not found");
+    // The lip toggle must move the lips substantially more than the eyes.
+    if (lipWarp.lip < 1.0 || lipWarp.lip <= lipWarp.eye * 3) {
+      fail(
+        `lip warp not firing on a closed mouth: lip Δ${lipWarp.lip.toFixed(2)} vs eye Δ${lipWarp.eye.toFixed(2)} (toggling lips barely changed the lips)`,
+      );
+    }
+    log(
+      `closed-mouth lip warp isolated (lips-on vs off: lip Δ${lipWarp.lip.toFixed(2)} ≫ eye Δ${lipWarp.eye.toFixed(2)}) ✓`,
+    );
 
     if (consoleErrors.length) {
       fail(`console errors:\n  - ${consoleErrors.join("\n  - ")}`);
