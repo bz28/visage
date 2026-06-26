@@ -18,7 +18,7 @@ import {
   type SimulatableArea,
   type ProfileArea,
 } from "@/lib/simulation";
-import { warpAreas } from "@/lib/warp";
+import { warpAreas, warpLips } from "@/lib/warp";
 import { loadImage } from "@/lib/image";
 import type { Assessment } from "@/lib/assessment-schema";
 import type { Intake as IntakeData } from "@/lib/intake-schema";
@@ -141,25 +141,38 @@ export function ScanFlow() {
       setCombinedSrc(null);
       return;
     }
-    const genSel = simSel.filter((a) => !isFrontWarpArea(a));
-    const warpSel = simSel.filter(isFrontWarpArea);
+    // Split by how each area is rendered: lips + chin/jaw are GEOMETRIC warps
+    // (reshape the patient's own pixels, identity-locked); cheeks/folds are the
+    // generative model (flat-area volume, no border to evert).
+    const genSel = simSel.filter((a) => !isFrontWarpArea(a) && a !== "lips");
+    const projSel = simSel.filter(isFrontWarpArea); // chin / jaw
+    const lipsOn = simSel.includes("lips");
 
-    // Generative base (lips/cheeks/folds) pasted onto the original — or the
-    // untouched original if nothing generative is selected / it's not ready yet.
+    // Generative base (cheeks/folds) pasted onto the original — or the untouched
+    // original if nothing generative is selected / it's not ready yet.
     let base = src?.dataUrl ?? null;
     const prep = frontPrepRef.current;
     if (genSel.length && prep) {
       const pasted = pasteComposite(prep, genSel);
       if (pasted) base = pasted;
     }
-    if (!base) return;
+    if (!base || !src) {
+      if (base) setCombinedSrc(base);
+      return;
+    }
 
-    // Warp chin/jaw on top. Reuse the cached original image when the base IS the
-    // original (no generative paste); otherwise decode the pasted base.
-    if (warpSel.length && src) {
-      const img = genSel.length && prep ? await loadImage(base) : src.img;
-      const warped = warpAreas(img, src.lm, warpSel, src.width, src.height);
-      if (warped) base = warped;
+    // Apply the geometric warps in sequence: fuller lips, then chin/jaw
+    // projection. Each pastes only its own region back onto the original, so the
+    // rest stays exact. (loadImage decodes the prior step's result.)
+    if (lipsOn) {
+      const img = await loadImage(base);
+      const w = warpLips(img, src.lm, src.width, src.height);
+      if (w) base = w;
+    }
+    if (projSel.length) {
+      const img = await loadImage(base);
+      const w = warpAreas(img, src.lm, projSel, src.width, src.height);
+      if (w) base = w;
     }
     if (rid !== recomposeId.current) return; // a newer toggle superseded us
     setCombinedSrc(base);
@@ -375,12 +388,13 @@ export function ScanFlow() {
         height: h,
         dataUrl: frontImg.dataUrl,
       };
-      // The generative model handles the surface/volume areas; chin + jawline are
-      // warped (projection that reads head-on). If only chin/jaw are recommended
-      // there's no generative work — just the instant, free warp.
+      // The generative model handles only the flat-area volume (cheeks / folds);
+      // lips and chin/jaw are geometric warps. If nothing generative is
+      // recommended (e.g. the lips-only wedge) there's no API call at all —
+      // just the instant, free, identity-locked warp.
       const genFront = uniqueAreas
         .filter(isSimulatable)
-        .filter((a) => !isFrontWarpArea(a));
+        .filter((a) => !isFrontWarpArea(a) && a !== "lips");
       if (genFront.length > 0) {
         void generateCombined(
           { dataUrl: frontImg.dataUrl, width: w, height: h },
