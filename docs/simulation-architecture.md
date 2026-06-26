@@ -17,24 +17,29 @@ defensible. (For a step-by-step walkthrough of the app, see `how-it-works.md`.)
 
 Everything below follows from that one rule.
 
-## Geometry is the source of truth; AI is a contained renderer
+## Geometry vs. AI — and where each is the source of truth
 
-The core decision: a **deterministic 3D-mesh warp is the simulation backbone**,
-and generative AI is only ever a **photoreal finisher**, never the decider.
+Two engines, each authoritative for a different view (see "The split is by VIEW"
+below for the why):
 
-- We fit a 3D face model (MediaPipe gives 468 points *with depth* + topology,
-  on-device, free).
-- Each treatment is a **calibrated volume displacement in 3D** — a function of
-  `(area, millimetres, geometry)`. This is what the surgeon's real before/after
-  photos calibrate against (`surgeon-calibration.md`). **Generative AI cannot be
-  calibrated to millimetres — that's why it can't be the source of truth.**
-- We warp the patient's own pixels along that displacement. Because it's a 3D
-  model, the *same* change renders correctly on **front and profile**.
+- **The warp is the source of truth on the PROFILE.** We fit a face model
+  (MediaPipe: 468 points *with depth* + topology, on-device, free) and move the
+  patient's own pixels by a **calibrated displacement** — a function of
+  `(area, millimetres, geometry)` the surgeon's before/after photos calibrate
+  against (`surgeon-calibration.md`). It's **deterministic** (same input → same
+  output), can't change identity (real pixels), and is correct at the angle where
+  the AI paste fails.
+- **The AI renders the FRONT, contained by the composite.** A fuller lip or a
+  lifted cheek is a **lighting** change, and only a generative model can *paint
+  new light*. We let it edit, then the **identity-lock composite** pastes only the
+  treated regions back onto the original and rejects expression drift — so the AI
+  decides the *look* but can't change *identity*. It's **stochastic** (can't be
+  dialed to exact mm), so front "calibration" is prompt-strength tuning, not
+  millimetres.
 
-**Deterministic** = same input → same output, by formula. You can dial it to an
-exact amount, it can't change identity (it's the patient's pixels), and angles
-agree. **Generative** = stochastic; it samples, so it can't guarantee any of
-those. For a medical preview, the deterministic backbone is non-negotiable.
+**Deterministic** = dial-to-amount, identity-safe, angles agree. **Generative** =
+realistic light/texture, but contained — never the unguarded source of truth. The
+non-negotiable in both is the **identity lock**: the patient always sees *them*.
 
 ## Why not a full 3D render? (the obvious-but-wrong end goal)
 
@@ -79,34 +84,39 @@ AI isn't one thing. Three distinct kinds, in three roles:
 3. **Rendering new material — generative AI (Gemini).** Used *surgically and
    identity-locked*, only where reshaping can't do the job (see the map below).
 
-## Where each tool goes — and how it scales
+## The split is by VIEW, not just by treatment
 
-| Treatment | Tool | Why |
+The one rule above is true, but real-photo testing taught us the *sharper* cut
+is **which view the photo is**, because that decides whether the dominant change
+is *lighting* (AI) or *silhouette* (warp):
+
+- **FRONT photo → generative AI + identity-lock composite.** Filler on a front
+  face is mostly a **volume + lighting** change — a fuller lip catches new light,
+  a lifted cheek gains a highlight, a softened fold fills a shadow. You have to
+  **render new light**, which a warp fundamentally can't do (it only drags
+  existing pixels, so a "projected" feature keeps its old shading and reads as a
+  *shadow that doesn't belong*). The AI paints the new light correctly and is
+  robust across faces; the composite pastes only the treated regions back onto
+  the original and rejects expression drift. Toggling an area off reverts that
+  region to the **clean original pixels** — no residual.
+- **PROFILE photo → deterministic warp** (chin / jaw / nose projection). From the
+  side, the change is a **silhouette** — pure geometry, dramatic, and the
+  generative paste *fails at an angle* (its eye-corner alignment is frontal). The
+  warp is the only tool that works here, and it's identity-locked, free, and
+  mm-calibratable.
+
+| View → tool | Treatments | Why |
 |---|---|---|
-| Chin / jaw / nose (projection) | **Warp** | Pure shape — real pixels, calibratable, multi-angle. |
-| Lips (fullness) | **Warp + generative texture finish** | Everting the vermillion border is a shape change — identity-locked, no shape/mouth drift. A low-strength generative *texture* pass then adds the filler sheen, identity-locked to the lip region (built; see Status). |
-| Cheeks (volume) | **Warp + generative finish** | Shape is a warp; the new highlight needs rendering. |
-| Under-eye / tear trough | **Generative** | Filling a *shadow* is a lighting change, not a shape change. |
-| Botox / tox (softening lines) | **Generative** | A texture/appearance change. |
-| Skin (tone, texture, boosters) | **Generative** | Pure appearance, no shape. |
+| **Front → AI + composite** | lips, cheeks, folds, chin, jaw | Volume + new lighting → must be *rendered*; AI handles soft, variable features and light; a warp can't relight. |
+| **Profile → warp** | chin / jaw / nose projection | Silhouette change — real pixels, calibratable; AI paste breaks at the angle. |
+| Later: under-eye, tox, skin | — | Pure appearance/lighting → generative (front). |
 
-The pattern: as the product grows from *projection* → *volume* → *under-eye* →
-*tox/skin*, **generative AI's role grows** (more "appearance," less "shape"),
-while the warp owns the entire structural half.
-
-## The optimal pipeline: geometry-first, AI-finish
-
-The best version isn't warp *or* AI — it's **warp first, AI second**:
-
-1. The warp produces the correct, calibrated, identity-safe geometry (every
-   angle).
-2. An *optional* low-strength generative pass, **conditioned on that warped
-   image**, paints photoreal shading where it matters — then we identity-lock it
-   back onto real pixels.
-
-You get medical control **and** photorealism, with generative always *contained
-and locked*, never the uncontrolled source of truth. That's what keeps it on the
-right side of the medical-trust line.
+**Why not warp the front too (with an AI finish on top)?** We tried it. A
+warp+finish on the front costs the *same* AI call as pure-generative but inherits
+the warp's geometric fragility — on real faces it distorted lips (everting a
+parted mouth), tugged the lip when projecting the chin, and left relight-less
+shadows. Pure generative is simpler *and* more realistic for the same cost. The
+warp earns its place on the **profile**, where geometry is the whole game.
 
 ## How this differs from what's out there
 
@@ -114,42 +124,46 @@ right side of the medical-trust line.
 |---|---|---|
 | FaceApp / "AI surgery" apps | Pure generative | Pretty, but uncontrolled, changes identity, can't match real mm, inconsistent. Entertainment. |
 | Crisalix (medical leader) | True 3D from a scanner / many photos | Most accurate, but needs special capture, expensive, in-clinic. |
-| **Visage** | **Geometry-first warp from one phone photo + AI as a contained renderer** | Crisalix-grade *control* from a *single selfie*, plus AI photorealism where it counts. |
+| **Visage** | **AI + identity-lock composite on the front, deterministic warp on the profile — from one phone photo** | Photoreal front result + calibratable profile projection, from a *single selfie*. |
 
-**The bet:** medical-grade control (deterministic, calibratable, identity-safe,
-multi-angle) delivered from a single phone photo — with AI used surgically only
-where it adds real photorealism. The moat is the calibration (the surgeon's data
-makes the warp clinically real); accessibility (one selfie, no scanner) is the
-wedge.
+**The bet:** a believable, identity-safe preview from a single phone photo — AI
+rendering the front (where filler is volume + light), a deterministic warp owning
+the profile (where it's silhouette and calibratable to mm). Accessibility (one
+selfie, no scanner) is the wedge; the surgeon's calibration data is the moat.
+
+## How we got here (why this approach)
+
+The engine was originally **warp-everywhere** — geometry as the source of truth,
+AI only as a finisher. That's still right *on the profile*, and it's how we fixed
+the original reported bug (the generative paste distorting lips at an angle). But
+when we extended the warp to the **front**, real-photo testing broke it three
+ways: it **distorted lips** (everting a parted/male mouth), it **tugged the lip**
+when projecting the chin (the displacement field bled upward), and it left
+**shadows that wouldn't relight** (a warp moves pixels but can't paint the new
+light a fuller feature needs). Each was a symptom of the same ceiling: *on the
+front, filler is a lighting change, and a warp can't relight.* So the front moved
+to generative + identity-lock composite (AI renders the light; the composite
+keeps identity and reverts cleanly on toggle), and the warp was kept where it
+genuinely wins — the **profile**. See "The split is by VIEW" above.
 
 ## Status (snapshot — trust the code over this section)
 
-- **Built today:** the deterministic warp engine drives **all reshape
-  treatments** — lips (eversion), chin/jaw/nose (projection) — on **both** the
-  profile and the front, identity-locked. The generative model is scoped to
-  **flat-area volume** (cheeks, folds) plus a **texture finish**. The vision-LLM
-  read; on-device measurements + landmarks; identity-lock composite.
-- **Texture finish (built + wired):** after the lip warp shows instantly, a
-  background generative pass adds the photoreal sheen/highlight the geometry
-  can't synthesize, then is **identity-locked to the lip region** of the warp so
-  it can add texture but never move the shape. It's a **progressive enhancement**:
-  the warp is the floor (always shown), the finish swaps in when ready, and any
-  drift/refusal/timeout **fails silently to the warp**. It only fires on a relaxed
-  **closed mouth** (the gated norm) — on an open/smiling mouth the model tends to
-  nudge the smile and the harness rejects it, so attempting it would just burn a
-  call. Debounced + cached (one call per settled view).
-  - *Validated (real key):* the warp→finish→identity-lock pipeline produces a
-    clean locked result on a **closed-mouth** fixture (`test/fixtures/
-    test-face-closed.jpg`, regenerable via `scripts/make-closed-mouth-fixture.mjs`)
-    — MediaPipe detects it, the mouth reads closed, and the finish locks in
-    (`FINISH LOCKED ✓`) with natural, fuller-textured lips and identity preserved.
-    The wired trigger + fail-silent + closed-mouth gate are verified in the live
-    flow (open mouth → harness rejects → keeps the warp; closed mouth → texture
-    lands).
-  - *Remaining (small):* the automated e2e runs under the image-gen mock (so the
-    finish echoes — no real texture to assert) and on the open-mouth fixture (so
-    the finish is correctly skipped). A finish-path e2e using the closed-mouth
-    fixture would add wiring coverage — nice-to-have, not a correctness risk.
-- **Next:** calibration of every warp magnitude **and** the finish texture
-  strength to the surgeon's real before/after photos (`docs/surgeon-calibration.md`);
-  a closed-mouth e2e fixture; optionally a cross-fade on the finish swap.
+- **Front (built):** generative AI (`/api/simulate` → `buildCombinedPrompt`) edits
+  every recommended area in one pass; the **identity-lock composite**
+  (`prepareComposite`/`pasteComposite`) pastes only the treated regions back onto
+  the original and rejects expression drift. Toggling a region re-pastes instantly
+  (cached, no new call) and toggling it *off* reverts to the clean original.
+  *Validated (real key):* on `test-face-closed.jpg` the front lips/cheeks/chin/jaw
+  read natural with correct lighting, no distortion; toggling chin+jaw off reverts
+  the lower face to ≈original (no residual shadow). One paid call per photo;
+  instant toggling.
+- **Profile (built):** the deterministic warp (`warpAreas`) projects chin / jaw /
+  nose from the side — identity-locked, free, mm-calibratable, and correct at the
+  angle where the AI paste fails. The lips are anchored in the warp so projecting
+  the chin can't tug them.
+- **Also:** the vision-LLM read (Claude); on-device measurements + landmarks.
+- **Next:** **front** calibration is now *prompt-strength* tuning with the surgeon
+  (the generative is qualitative, not mm — see `docs/surgeon-calibration.md`);
+  **profile** keeps mm-calibratable warp magnitudes. Optional later: a profile
+  generative finish (needs the angle-composite problem solved first), and moving
+  cheeks to a richer treatment if testing shows the front needs it.
