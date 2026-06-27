@@ -14,13 +14,12 @@ import {
 import {
   isSimulatable,
   isProfileArea,
-  isFrontWarpArea,
   type SimulatableArea,
   type ProfileArea,
 } from "@/lib/simulation";
-import { warpAreas, warpLips } from "@/lib/warp";
+import { warpAreas } from "@/lib/warp";
 import { loadImage } from "@/lib/image";
-import { AREA_LABELS, type Assessment } from "@/lib/assessment-schema";
+import type { Assessment } from "@/lib/assessment-schema";
 import type { Intake as IntakeData } from "@/lib/intake-schema";
 import type { ViewKey } from "@/lib/views";
 import { Intake } from "./Intake";
@@ -73,36 +72,10 @@ export function ScanFlow() {
   const [combinedLoading, setCombinedLoading] = useState(false);
   const [combinedFailed, setCombinedFailed] = useState(false);
   // The prepared front generation (loaded images + gen landmarks + transform),
-  // computed ONCE when the generation lands. Toggling areas re-pastes a subset
-  // from this — a pure canvas op, no face-detect — so it's instant.
+  // computed ONCE when the generative result lands. Toggling areas re-pastes a
+  // subset from this — a pure canvas op, no face-detect, no API — so it's instant,
+  // and toggling an area OFF reverts that region to the clean original pixels.
   const frontPrepRef = useRef<CompositePrep | null>(null);
-  // The front photo + its landmarks, cached so chin/jaw can be WARPED on the
-  // front (projection that reads head-on) on top of the generative lips/cheeks —
-  // mirrors profileWarpRef. dataUrl is the untouched original (the warp base).
-  const frontWarpRef = useRef<{
-    img: HTMLImageElement;
-    lm: Pt[];
-    width: number;
-    height: number;
-    dataUrl: string;
-  } | null>(null);
-  // Bumped on every recompose AND on reset()/analyze(), so a slow paste+warp or
-  // background finish from an old toggle/photo can't land after a newer one —
-  // critical because these async paths handle face photos (a stale finish from
-  // photo A must never composite onto photo B).
-  const recomposeId = useRef(0);
-  // The background texture-finish: a debounce timer + the cached generative
-  // texture output for THIS photo (fetched at most once; re-applied locally on
-  // every toggle). Cleared on re-analyze + reset.
-  // finishInFlightRef latches a paid call so concurrent toggles can't fire a
-  // second one; finishAbortRef lets reset()/analyze() actually cancel an
-  // in-flight request rather than just ignore its result.
-  const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // { image } = cached texture to re-apply; { image: null } = gave up (don't
-  // re-call); null = not yet attempted for this photo.
-  const finishCacheRef = useRef<{ image: string | null } | null>(null);
-  const finishInFlightRef = useRef(false);
-  const finishAbortRef = useRef<AbortController | null>(null);
 
   // The optional PROFILE (side-view) before/after — projection areas (chin / jaw
   // / nose) shown from the side, where their real effect reads. Only when a
@@ -139,180 +112,21 @@ export function ScanFlow() {
     setSelected(next);
   }
 
-  // Recompose the front "after" for the current selection: paste the generative
-  // areas (lips / cheeks / folds) from the cached prep, then WARP chin / jaw on
-  // top (their projection reads head-on too). Both are pure on-device ops; the
-  // warp loads the pasted result, so this is async + guarded against a newer
-  // toggle landing first.
-  async function recompose(sel: Set<string>) {
-    const src = frontWarpRef.current;
-    // Bump FIRST, so clearing the selection (or any newer toggle) invalidates a
-    // warp still suspended on its loadImage — otherwise that stale warp resumes
-    // and clobbers the blank the user just asked for.
-    const rid = ++recomposeId.current;
+  // Re-paste the cached front generation down to the currently-selected regions —
+  // a pure canvas op (no face-detect, no API), so toggling is instant. The AI
+  // generated every recommended area once; here we paste back only the selected
+  // ones. Toggling an area OFF reverts that region to the clean original pixels
+  // (no residual shadow). Synchronous, so there's no out-of-order race.
+  function recompose(sel: Set<string>) {
+    const prep = frontPrepRef.current;
+    if (!prep) return; // generation not ready (or it fell back) — nothing to paste
     const simSel = [...sel].filter(isSimulatable);
     if (simSel.length === 0) {
       setCombinedSrc(null);
       return;
     }
-    // Split by how each area is rendered: lips + chin/jaw are GEOMETRIC warps
-    // (reshape the patient's own pixels, identity-locked); cheeks/folds are the
-    // generative model (flat-area volume, no border to evert).
-    const genSel = simSel.filter((a) => !isFrontWarpArea(a) && a !== "lips");
-    const projSel = simSel.filter(isFrontWarpArea); // chin / jaw
-    const lipsOn = simSel.includes("lips");
-
-    // Generative base (cheeks/folds) pasted onto the original — or the untouched
-    // original if nothing generative is selected / it's not ready yet.
-    let base = src?.dataUrl ?? null;
-    const prep = frontPrepRef.current;
-    if (genSel.length && prep) {
-      const pasted = pasteComposite(prep, genSel);
-      if (pasted) base = pasted;
-    }
-    if (!base || !src) {
-      if (base) setCombinedSrc(base);
-      return;
-    }
-
-    // Lips are only warped on a relaxed CLOSED mouth. Everting the lip border on
-    // an open/parted mouth pushes the lower lip down into the teeth and distorts
-    // it — and lip filler is assessed on a closed mouth anyway (we nudge for one
-    // at capture). On an open mouth we skip the lip preview rather than show a
-    // distortion; chin/jaw + cheeks/folds still apply.
-    const lipsWarpable = lipsOn && !isMouthOpen(src.lm);
-
-    // Apply the geometric warps in sequence: fuller lips, then chin/jaw
-    // projection. Each pastes only its own region back onto the original, so the
-    // rest stays exact. (loadImage decodes the prior step's result.)
-    if (lipsWarpable) {
-      const img = await loadImage(base);
-      const w = warpLips(img, src.lm, src.width, src.height);
-      if (w) base = w;
-    }
-    if (projSel.length) {
-      const img = await loadImage(base);
-      const w = warpAreas(img, src.lm, projSel, src.width, src.height);
-      if (w) base = w;
-    }
-    if (rid !== recomposeId.current) return; // a newer toggle superseded us
-    setCombinedSrc(base);
-
-    // Progressive enhancement: the warp shape is shown instantly above; now add
-    // the photoreal filler TEXTURE (sheen/highlight) the warp can't synthesize,
-    // as a background pass that swaps in when ready. Lips only — the everted lip
-    // is where flat geometry reads least real; chin/jaw projection is structural
-    // (no filler sheen) and cheeks already go through the generative model.
-    // Same closed-mouth gate as the warp: on an open mouth there's no lip warp to
-    // finish, and the texture pass would nudge the smile (harness rejects it).
-    if (lipsWarpable) void finishFront(base, rid);
-  }
-
-  // Background "+finish": add the photoreal lip texture the warp can't, and swap
-  // it in. The expensive part — the generative texture — is fetched at most ONCE
-  // per photo and cached: the lip warp is deterministic and the texture only
-  // depends on the lips, so toggling cheeks/chin re-applies the cached texture
-  // LOCALLY (no API). Fail-silent: any error/refusal/timeout keeps the warp.
-  async function finishFront(warpResult: string, rid: number) {
-    // One attempt per photo, whatever the outcome: { image } caches a usable
-    // texture to re-apply locally; { image: null } latches "gave up" (fallback /
-    // refusal / error) so a persistent failure can't re-fire a paid call on every
-    // toggle. Either way, a non-null cache entry means "don't call Gemini again".
-    const cache = finishCacheRef.current;
-    if (cache) {
-      if (cache.image) void applyFinish(warpResult, cache.image, rid);
-      return;
-    }
-    if (finishInFlightRef.current) return; // a paid call already running this photo
-    if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
-    finishTimerRef.current = setTimeout(async () => {
-      // Re-check both guards at fire time (a newer toggle or a reset/analyze may
-      // have landed during the debounce).
-      if (rid !== recomposeId.current || finishInFlightRef.current) return;
-      finishInFlightRef.current = true;
-      // Abortable so reset()/analyze() can cancel the prior photo's call outright
-      // (not just ignore its result); 65s ceiling on a hung request.
-      const controller = new AbortController();
-      finishAbortRef.current = controller;
-      try {
-        const res = await fetch("/api/simulate", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            image: warpResult,
-            finishAreas: ["lips"],
-            // So the texture pass keeps the exact mouth/teeth — else the harness
-            // rejects it (the warp preserves the original mouth state).
-            mouthOpen: frontWarpRef.current
-              ? isMouthOpen(frontWarpRef.current.lm)
-              : undefined,
-          }),
-          signal: AbortSignal.any([
-            controller.signal,
-            AbortSignal.timeout(65_000),
-          ]),
-        });
-        // A non-2xx (e.g. a platform 500 returning HTML) would make res.json()
-        // throw — treat it as a give-up like any other failure.
-        const data: { image?: string } = res.ok ? await res.json() : {};
-        // Guard BEFORE any write: if the user moved on (toggle / Start over /
-        // re-scan) the cache + frontWarpRef now belong to a DIFFERENT photo, and
-        // writing this photo's texture into them would bleed one face onto another.
-        if (rid !== recomposeId.current) return;
-        if (!data.image) {
-          finishCacheRef.current = { image: null }; // give up — don't retry
-          return;
-        }
-        finishCacheRef.current = { image: data.image };
-        await applyFinish(warpResult, data.image, rid);
-      } catch {
-        // Transient (timeout/network/abort) — latch give-up to bound paid calls,
-        // but only for the photo that's still current. The warp is already shown;
-        // a re-analyze clears the latch for a retry.
-        if (rid === recomposeId.current) finishCacheRef.current = { image: null };
-      } finally {
-        // Only release the latch if we still OWN it. After a reset/re-scan,
-        // teardownFinish already cleared it (and a newer photo's finish may have
-        // re-latched) — clearing unconditionally here would free the new photo's
-        // latch and let a duplicate paid call slip through.
-        if (finishAbortRef.current === controller) {
-          finishInFlightRef.current = false;
-          finishAbortRef.current = null;
-        }
-      }
-    }, 450);
-  }
-
-  // Identity-lock a (cached or fresh) texture output onto the current warp base:
-  // paste ONLY its lip region over the warp, so it adds sheen but cannot move the
-  // shape we already set. The mouth-drift harness rejects expression drift — on a
-  // relaxed closed mouth the texture lands; otherwise we keep the warp.
-  async function applyFinish(warpResult: string, aiImage: string, rid: number) {
-    const src = frontWarpRef.current;
-    if (!src) return;
-    try {
-      const wimg = await loadImage(warpResult);
-      const det = await detectFace(wimg, src.width, src.height);
-      if (det.status !== "ok" || !det.landmarks) return;
-      const prep = await prepareComposite(
-        warpResult,
-        det.landmarks,
-        ["lips"],
-        aiImage,
-        src.width,
-        src.height,
-      );
-      if (!prep.ok || !prep.prep) {
-        // Expected on an open/smiling mouth — keep the warp, note for QA only.
-        console.debug(`[finish] kept warp: ${prep.reason}`);
-        return;
-      }
-      const locked = pasteComposite(prep.prep, ["lips"]);
-      if (!locked || rid !== recomposeId.current) return;
-      setCombinedSrc(locked);
-    } catch {
-      // fail-silent — the warp result is already on screen
-    }
+    const dataUrl = pasteComposite(prep, simSel);
+    if (dataUrl) setCombinedSrc(dataUrl);
   }
 
   // Generate the combined "after" once, retrying if the harness rejects it
@@ -359,7 +173,7 @@ export function ScanFlow() {
         frontPrepRef.current = prep;
         // Paste for the CURRENT selection (the user may have toggled while the
         // generation was running), not just the areas we generated.
-        await recompose(selectedRef.current);
+        recompose(selectedRef.current);
       } else {
         setCombinedFailed(true);
       }
@@ -377,7 +191,7 @@ export function ScanFlow() {
     if (next.has(area)) next.delete(area);
     else next.add(area);
     applySelection(next);
-    if (frontWarpRef.current) void recompose(next);
+    if (frontPrepRef.current) recompose(next);
     // The profile preview (chin / jaw / nose) re-pastes too — but only when a
     // projection area was toggled, so a lips/cheeks toggle doesn't needlessly
     // re-paste the profile panel.
@@ -513,42 +327,24 @@ export function ScanFlow() {
       // Start with every recommended area selected (the full plan).
       applySelection(new Set(assessment.areas.map((a) => a.area)));
       frontPrepRef.current = null;
-      // New photo → invalidate any suspended recompose/finish from a prior scan
-      // (so it can't composite the old face onto this one) and drop the prior
-      // photo's cached lip texture + any in-flight call.
-      recomposeId.current++;
-      teardownFinish();
       setCombinedSrc(null);
       setStep("result");
 
       // Kick off the combined before/after in the background so it's rendering
-      // while they read the plan.
+      // while they read the plan. The FRONT is generated by the AI (lips, chin,
+      // jaw, cheeks, folds) and identity-locked by the composite — it renders the
+      // new volume + lighting a warp can't, and toggling reverts cleanly. (The
+      // PROFILE, below, stays a deterministic warp.)
       const gen = ++genId.current;
       const uniqueAreas = [...new Set(assessment.areas.map((a) => a.area))];
-      // Cache the front warp source so chin/jaw can project on the front too.
-      frontWarpRef.current = {
-        img,
-        lm: landmarks,
-        width: w,
-        height: h,
-        dataUrl: frontImg.dataUrl,
-      };
-      // The generative model handles only the flat-area volume (cheeks / folds);
-      // lips and chin/jaw are geometric warps. If nothing generative is
-      // recommended (e.g. the lips-only wedge) there's no API call at all —
-      // just the instant, free, identity-locked warp.
-      const genFront = uniqueAreas
-        .filter(isSimulatable)
-        .filter((a) => !isFrontWarpArea(a) && a !== "lips");
-      if (genFront.length > 0) {
+      const frontAreas = uniqueAreas.filter(isSimulatable);
+      if (frontAreas.length > 0) {
         void generateCombined(
           { dataUrl: frontImg.dataUrl, width: w, height: h },
           landmarks,
-          genFront,
+          frontAreas,
           gen,
         );
-      } else {
-        void recompose(selectedRef.current);
       }
 
       // If a side photo was provided, also generate a profile before/after for
@@ -564,18 +360,6 @@ export function ScanFlow() {
     }
   }
 
-  // Cancel + clear all background texture-finish state. Aborting the in-flight
-  // request (not just ignoring it) is what stops a prior photo's call from
-  // resolving into a new scan.
-  function teardownFinish() {
-    if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
-    finishTimerRef.current = null;
-    finishAbortRef.current?.abort();
-    finishAbortRef.current = null;
-    finishInFlightRef.current = false;
-    finishCacheRef.current = null;
-  }
-
   function reset() {
     setIntake(null);
     setPhotos({});
@@ -584,13 +368,10 @@ export function ScanFlow() {
     setError(null);
     setHighlightedArea(null);
     genId.current++; // invalidate any in-flight combined generation
-    recomposeId.current++; // invalidate any suspended recompose/finish too
     setCombinedSrc(null);
     setCombinedFailed(false);
     setCombinedLoading(false);
     frontPrepRef.current = null;
-    frontWarpRef.current = null;
-    teardownFinish();
     setProfile(null);
     setProfileSrc(null);
     setProfileLoading(false);
@@ -730,44 +511,6 @@ export function ScanFlow() {
                                   : undefined
                             }
                           />
-                          {/* When the generative pass fails but the lip/chin/jaw
-                              warp still rendered, the preview shows SOME selected
-                              areas and silently omits the generative ones (cheeks/
-                              folds). Say so — never present a partial after as the
-                              whole plan. */}
-                          {combinedFailed &&
-                            combinedSrc &&
-                            (() => {
-                              const missing = [...selected].filter(
-                                (a) =>
-                                  isSimulatable(a) &&
-                                  !isFrontWarpArea(a) &&
-                                  a !== "lips",
-                              );
-                              if (missing.length === 0) return null;
-                              const names = missing
-                                .map((a) => AREA_LABELS[a] ?? a)
-                                .join(" and ");
-                              return (
-                                <p className="text-xs text-ink-400">
-                                  Your {names} preview couldn&apos;t be generated
-                                  this time — {missing.length > 1 ? "they're" : "it's"}{" "}
-                                  still part of your read to discuss with a provider.
-                                </p>
-                              );
-                            })()}
-                          {/* Lips were recommended but the mouth is open — we skip
-                              the lip warp (everting a parted mouth distorts it), so
-                              tell the patient how to get the lip preview. */}
-                          {selected.has("lips") &&
-                            frontWarpRef.current &&
-                            isMouthOpen(frontWarpRef.current.lm) && (
-                              <p className="text-xs text-ink-400">
-                                For a lip preview, retake with a relaxed, closed
-                                mouth — lips read truest that way. Your read still
-                                includes them.
-                              </p>
-                            )}
                         </div>
                       )}
 

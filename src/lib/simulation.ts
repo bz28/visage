@@ -71,21 +71,6 @@ export function isProfileArea(area: string): area is ProfileArea {
   return (PROFILE_AREAS as readonly string[]).includes(area);
 }
 
-/**
- * On the front photo, chin + jawline are rendered by the angle-aware projection
- * warp (`warpAreas`) — a defined jawline / projected chin that reads head-on,
- * identity-locked and free. (Lips are also a warp, but a different one —
- * eversion via `warpLips` — so they're handled separately, not in this set.)
- * The generative model is left with only the flat-area volume: cheeks + folds.
- */
-export const FRONT_WARP_AREAS = ["chin", "jawline"] as const;
-// A subtype of BOTH SimulatableArea and ProfileArea, so .filter() narrows
-// cleanly for the front warp (which feeds warpAreas, typed ProfileArea[]).
-export type FrontWarpArea = (typeof FRONT_WARP_AREAS)[number];
-export function isFrontWarpArea(area: string): area is FrontWarpArea {
-  return (FRONT_WARP_AREAS as readonly string[]).includes(area);
-}
-
 /** Everything the region masks / composite can paint: front areas + nose. */
 export type EditableArea = SimulatableArea | "nose";
 
@@ -137,48 +122,6 @@ export function buildCombinedPrompt(
     `Edit this photo to show a natural dermal-filler result: ${edits}. ` +
     `Keep each change subtle and optimal (about one syringe each). Change ONLY ` +
     `these areas — nothing else. ${mouthRule(areas.includes("lips"), mouthOpen)}` +
-    PRESERVE_RULE
-  );
-}
-
-// Areas eligible for the texture "+finish" — only the soft-tissue volume areas
-// where a sheen reads (lips today; cheeks once they're warped). NOT chin/jaw/nose
-// (bony projection has no filler sheen) or folds (a crease, not added volume).
-export const FINISH_AREAS = ["lips", "cheeks"] as const;
-export type FinishArea = (typeof FINISH_AREAS)[number];
-export function isFinishArea(area: string): area is FinishArea {
-  return (FINISH_AREAS as readonly string[]).includes(area);
-}
-
-// Human names for the finish prompt — total over FinishArea, so an unmapped area
-// is a compile error, not a raw enum key leaking into the prompt.
-const FINISH_LABEL: Record<FinishArea, string> = {
-  lips: "lips",
-  cheeks: "cheeks",
-};
-
-/**
- * The "+finish" pass. The geometric warp has already reshaped the area (fuller
- * lips / projected cheeks) — its shape is the patient's own pixels, moved. This
- * asks the model to add ONLY the photoreal *texture* the warp can't synthesize
- * (the soft sheen + volume highlight of real filler) without touching the shape,
- * so the result reads like a real result, not a stretch. The composite then
- * re-locks everything outside the area, so even the texture pass can't drift it.
- */
-export function buildFinishPrompt(
-  areas: FinishArea[],
-  mouthOpen?: boolean,
-): string {
-  const names = areas.map((a) => FINISH_LABEL[a]).join(" and the ");
-  return (
-    `This photo is a dermal-filler PREVIEW: the ${names} have already been made ` +
-    `fuller by reshaping. Add ONLY subtle, photorealistic filler texture to the ` +
-    `${names} — the soft sheen and gentle volume highlight that real filler gives ` +
-    `— so they look natural, not stretched. Do NOT change their shape, outline, ` +
-    `size, or position in any way, and change NOTHING else in the photo. ` +
-    // The texture pass must not nudge the mouth/teeth — the identity-lock harness
-    // rejects any expression drift, which would silently drop the finish.
-    mouthRule(areas.includes("lips"), mouthOpen) +
     PRESERVE_RULE
   );
 }

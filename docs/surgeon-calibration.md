@@ -65,12 +65,23 @@ profile?
   but is that the right clinical lean, and what should each direction *treat*?
 - Tailoring by **age / goal** — a couple of concrete examples?
 
+## Two things to calibrate (front vs. profile)
+
+The engine renders the **front** photo with AI and the **profile** photo with a
+geometric warp (see `docs/simulation-architecture.md`). So there are *two*
+calibrations, and they're different in kind:
+
+- **Front = AI prompt strength** (qualitative). We can't dial millimetres here —
+  we tune the *wording* (how "fuller," how "subtle"). We need your eye on whether
+  the AI's "natural ≈1-syringe result" is right.
+- **Profile = warp magnitude** (millimetres). Real numbers, calibratable.
+
 ## Profile projection — how *much* (the warp)
 
-The profile before/after is now a geometric **warp** (we move the patient's own
+The profile before/after is a geometric **warp** (we move the patient's own
 pixels forward, calibrated to mm — no AI). The amount per area is my best-guess
 placeholder, as a fraction of **face height** (`src/lib/warp.ts`, `AREA_WARP`).
-We need real numbers from you:
+Real numbers, please:
 
 - **Chin** projection — a *natural* (≈1 mL) forward projection is what % of face
   height, roughly? (placeholder ~5%)
@@ -80,34 +91,30 @@ We need real numbers from you:
 - Per-area **direction** — we push forward along the face's sagittal axis; is
   that right, or should chin drop / jaw flare more?
 
-## Lips — how *much* fuller (the lip warp)
+## Front result — how *strong* (the AI prompt)
 
-Lips (our v1 wedge) are now also a geometric **warp**, not AI: we evert the
-vermillion border outward from the mouth centre (taller, fuller lips) while
-**anchoring the mouth corners** so the mouth can't widen. The patient's own lips,
-made fuller — identity-locked, no AI, no shape/mouth drift. The amount is a
-fraction of **lip height** (`src/lib/warp.ts`, `LIP_MAG`). We need your read:
+The front before/after is generative AI, identity-locked to each treated region
+(`src/lib/simulation.ts`, `AREA_EDIT` / `buildCombinedPrompt`). The prompt asks
+for a "natural dermal-filler result, about one syringe each." We need your eye on
+whether that reads right — and where the wording should be dialed:
 
-- A *natural* ≈1-syringe lip result is what % taller, roughly? (placeholder ~22%
-  of lip height; we showed it looks natural but want your number)
-- Where does it start to look **overfilled / "duck"**? (so we cap the slider in
-  the clinician tool)
-- Should the **upper:lower** split be even, or more lower-lip? (we currently push
-  both borders out symmetrically)
-- Is **eversion** (border rolls out) the right model, or is it more **projection**
-  (the whole lip forward — only visible in profile)?
-- **Open vs closed mouth:** we gate patients to a relaxed closed mouth; confirm a
-  closed mouth is what you'd assess lip filler on.
-- **Texture / sheen:** on top of the shape, we add a subtle photoreal "filler
-  sheen" (the soft highlight real filler gives). How glossy is *too* glossy —
-  i.e. where does the texture cross from "natural fuller lip" into "obviously
-  done / wet-look"? (so we cap the finish strength)
+- **Lips** (our wedge) — does the AI's fuller lip look like a *natural* ~1-syringe
+  result, or too much / too little? Should it favor the **lower lip**? Where's the
+  line into **overfilled / "duck"**?
+- **Cheeks** — is "a softly lifted midface" the right amount, or does it read
+  overdone?
+- **Nasolabial / marionette folds** — we say *soften, never erase* (a creaseless
+  face reads fake). Is that the right instinct, and how much softening is natural?
+- **Chin / jaw on the FRONT** — chin filler mainly *projects* (shows in profile),
+  so we keep the front change subtle ("more defined, balanced lower face,"
+  "sharper jaw angle"). Confirm the front shouldn't show a dramatic chin change.
+- **Open vs closed mouth** — we nudge patients to a relaxed closed mouth; confirm
+  that's what you'd assess lip filler on.
 
-*Note for us (not the surgeon): the lip magnitude + texture finish were validated
-to look natural on an open-mouth test face; the warp→finish→identity-lock
-pipeline works, and the finish fails-silent to the warp on any drift. Open gap:
-no closed-mouth fixture yet, so the closed-mouth finish swap-in isn't covered by
-the automated e2e — add one. See docs/simulation-architecture.md.*
+*Note for us (not the surgeon): the front result was validated on a real key
+(`test-face-closed.jpg`) — lips/cheeks/chin/jaw read natural with correct
+lighting, no distortion; toggling areas off reverts to the clean original. The
+front "calibration" is the prompt wording above; the profile is the mm warp.*
 
 *Fix what's wrong, ignore what's fine. Code pointers live next to each value if
 you want them.*
