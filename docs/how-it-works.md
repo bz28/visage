@@ -83,9 +83,14 @@ background.
   preview" switch**. Toggle an area off and the before/after updates **instantly
   and for free** — we just re-paste a subset of the *same* generation, no new AI
   call. → `AssessmentResult.tsx`
-- Always labeled a **simulation**; some areas (nose, under-eye, temples) are
-  **discussed but not simulated** — nose's real change is in profile and it's the
-  highest-risk area, so we don't fake it head-on.
+- **Profile before/after (if a side photo was given).** A second panel projects
+  **chin / jaw / nose** from the side — but with a *different* engine: a
+  deterministic **geometric warp** that nudges the patient's own pixels forward
+  (no AI). The generative paste fails at an angle, and projection is the whole
+  story in profile, so geometry wins here. → `warp.ts`, `ScanFlow.tsx`.
+- Always labeled a **simulation**. On the **front** we don't simulate **nose,
+  under-eye, or temples** (subtle / high-risk; the nose's real change is in
+  profile) — they're discussed only. The **nose** *is* simulated on the profile.
 - **Code:** orchestrated by `ScanFlow.tsx`.
 
 ## 5. Book — turn interest into a consultation
@@ -131,8 +136,6 @@ Two env flags make local work fast/free (never on in production):
 
 ## What's next (not built yet)
 
-- **Profile / two-angle before/after** — also simulate on a side photo, to show
-  real chin/jaw projection and a true nose result (and the two-angle view).
 - **Surgeon calibration** — turn the placeholder filler amounts into clinically
   real ones (`surgeon-calibration.md`). The moat.
 - **Clinician / consult tool** — the in-office, coordinator-run side of the product
