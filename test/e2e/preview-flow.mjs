@@ -17,6 +17,7 @@ import { chromium } from "playwright-core";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..", "..");
 const FIXTURE = join(__dirname, "..", "fixtures", "test-face.jpg");
+const PROFILE_FIXTURE = join(__dirname, "..", "fixtures", "profile-face.jpg");
 const NO_FACE = join(__dirname, "..", "fixtures", "no-face.jpg");
 const PORT = process.env.E2E_PORT || "3100";
 const BASE = `http://localhost:${PORT}`;
@@ -126,10 +127,11 @@ async function main() {
     ]);
     if (await useAnyway.isVisible().catch(() => false)) await useAnyway.click();
 
-    // Add a side photo (reuse the fixture) so the profile before/after path runs.
+    // Add a real 3/4-view side photo so the profile WARP runs on a genuine angle
+    // (not a front-on face) — this is the warp's home turf.
     log("adding a side photo for the profile path…");
     await page.getByRole("button", { name: /^Add$/ }).first().click();
-    await page.locator('input[type="file"]').last().setInputFiles(FIXTURE);
+    await page.locator('input[type="file"]').last().setInputFiles(PROFILE_FIXTURE);
     const useAnyway2 = page.getByRole("button", { name: /Use anyway/i });
     await Promise.race([
       useAnyway2.waitFor({ timeout: 20_000 }).catch(() => {}),
