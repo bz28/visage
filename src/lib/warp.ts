@@ -57,16 +57,21 @@ const AREA_WARP: Record<ProfileArea, { movers: number[]; mag: number }> = {
   nose: { movers: [KEY.noseTip, KEY.subnasale, 195, 5, 4, 51, 281], mag: 0.022 },
 };
 
-// Landmarks held fixed so the warp stays local to the treated region: eyes,
-// brow, forehead, cheekbones — AND the mouth. The lips are anchored so the chin
-// (and jaw) projection can't tug the lower lip: without these pins the chin's
-// displacement field bleeds up into the lip region and visibly distorts it, even
-// though no lip point is a mover. (Only the PROJECTION warp uses these anchors —
-// the lip warp has its own control set, so lip fullness is unaffected.)
+// The stable face frame — eyes, brow, forehead, cheekbones. Held fixed (zero
+// displacement) so the warp stays local, AND used to compute the face centre
+// that sets each mover's "outward" direction.
 const ANCHORS = [
   KEY.eyeOuterR, KEY.eyeOuterL, KEY.eyeInnerR, KEY.eyeInnerL,
   KEY.trichion, KEY.glabella, KEY.nasion, KEY.zygionR, KEY.zygionL,
   127, 356, 234, 454,
+];
+
+// Extra zero-displacement pins around the mouth so the chin/jaw projection can't
+// tug the lip: without them the chin's displacement field bleeds up into the lip
+// region and distorts it, even though no lip point is a mover. These pin the lips
+// but are deliberately NOT in the centre/"outward" computation (they sit
+// below-centre and would skew the projection direction).
+const LIP_PINS = [
   KEY.upperLipTop, KEY.lowerLipBottom, KEY.mouthCornerR, KEY.mouthCornerL,
 ];
 
@@ -91,8 +96,9 @@ function buildControls(
   const scale = len(sub(lm[KEY.glabella], lm[KEY.menton])) || 200;
 
   const controls: Control[] = [];
-  // Anchors first (zero displacement) so the field decays to "no change".
-  for (const i of ANCHORS) {
+  // Frame anchors + lip pins, all zero displacement, so the field decays to
+  // "no change" at the face frame and the lips stay put.
+  for (const i of [...ANCHORS, ...LIP_PINS]) {
     if (lm[i]) controls.push({ p: lm[i], d: { x: 0, y: 0 } });
   }
   // Angle-aware direction. `turn` ≈ how far the head is turned (0 = head-on,
